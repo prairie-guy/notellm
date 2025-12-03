@@ -109,10 +109,16 @@ notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 Stop the JupyterLab server.
 
 ```bash
-notellm stop              # Graceful shutdown (uses PID file)
-notellm stop --port 9999  # Stop server on specific port
-notellm stop --force      # Force kill if needed
+notellm stop              # Stop all processes on configured port
+notellm stop --port 8888  # Stop all processes on port 8888
 ```
+
+**Behavior:**
+- Finds all processes using the specified port (or configured port from `.env.jupyter`)
+- Sends SIGTERM for graceful shutdown (waits up to 30 seconds)
+- Automatically sends SIGKILL if process doesn't exit
+- Cleans up `.jupyter.pid` file
+- Default port: Uses `.env.jupyter` if exists, otherwise 9999
 
 ### `notellm status`
 
@@ -142,7 +148,7 @@ notellm clean --purge     # Remove everything including dependencies
 - Preserves all user files and directories
 
 **With --purge:**
-- Also removes: `.venv/`, `uv.lock`, `pyproject.toml`, `CLAUDE.md`
+- Also removes: `.venv/`, `uv.lock`, `pyproject.toml`, `CLAUDE.md`, `.jupyter_ystore.db`, and any other `.jupyter*` files
 - Requires confirmation before proceeding
 - Use when you want to completely reset the workspace
 

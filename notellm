@@ -66,8 +66,15 @@ check_port_available() {
 is_jupyter_running() {
     if [ -f "$PID_FILE" ]; then
         local pid=$(cat "$PID_FILE")
+        # Check if parent process exists
         if ps -p "$pid" > /dev/null 2>&1; then
-            return 0
+            # Check if configured port is being listened on
+            if [ -f "$CONFIG_FILE" ]; then
+                source "$CONFIG_FILE"
+                if lsof -Pi :${JUPYTER_PORT} -sTCP:LISTEN -t >/dev/null 2>&1; then
+                    return 0
+                fi
+            fi
         fi
     fi
     return 1
@@ -119,8 +126,7 @@ ${YELLOW}START OPTIONS:${NC}
     -f, --foreground    Run server in foreground
 
 ${YELLOW}STOP OPTIONS:${NC}
-    -p, --port PORT     Stop server on specific port
-    -f, --force         Force kill if graceful shutdown fails
+    -p, --port PORT     Stop all processes on specific port
 
 ${YELLOW}CLEAN OPTIONS:${NC}
     --purge             Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md
@@ -134,8 +140,8 @@ ${YELLOW}EXAMPLES:${NC}
     notellm start -p 9998           # Start on port 9998
     notellm start --host myserver   # Start with custom hostname
     notellm status                  # Show server status and running instances
-    notellm stop                    # Stop the server
-    notellm stop -p 9999            # Stop server on port 9999
+    notellm stop                    # Stop all processes on configured port
+    notellm stop -p 8888            # Stop all processes on port 8888
     notellm clean                   # Remove config files
     notellm clean --purge           # Remove config + dependencies
     notellm new my_analysis         # Create notebooks/my_analysis.ipynb
@@ -448,6 +454,12 @@ EOF
         echo ""
         echo "  To stop:    notellm stop"
         exit 0
+    else
+        # Clean up stale PID file if it exists
+        if [ -f "$PID_FILE" ]; then
+            log_warn "Cleaning up stale PID file"
+            rm -f "$PID_FILE"
+        fi
     fi
     
     # Check port
@@ -485,14 +497,18 @@ EOF
             > "$LOG_FILE" 2>&1 &
         
         echo $! > "$PID_FILE"
-        sleep 2
-        
-        if is_jupyter_running; then
-            log_info "JupyterLab started (PID: $(cat $PID_FILE))"
-        else
+
+        # Wait for Jupyter to start listening (typically takes 2-3 seconds)
+        log_info "Waiting for server to start..."
+        sleep 5
+
+        # Verify server is listening
+        if ! lsof -Pi :${JUPYTER_PORT} -sTCP:LISTEN -t >/dev/null 2>&1; then
             log_error "Failed to start. Check $LOG_FILE"
             exit 1
         fi
+
+        log_info "JupyterLab started (PID: $(cat $PID_FILE))"
         
         echo ""
         echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
@@ -526,15 +542,10 @@ EOF
 #######################################
 
 cmd_stop() {
-    local force=false
     local port=""
 
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -f|--force)
-                force=true
-                shift
-                ;;
             -p|--port)
                 port="$2"
                 shift 2
@@ -547,14 +558,16 @@ ${YELLOW}USAGE:${NC}
     notellm stop [options]
 
 ${YELLOW}OPTIONS:${NC}
-    -p, --port PORT Port to stop server on (bypasses PID file)
-    -f, --force     Force kill if graceful shutdown fails
+    -p, --port PORT Stop all processes on specified port
     -h, --help      Show this help
 
+${YELLOW}BEHAVIOR:${NC}
+    Stops all processes using the configured port (kills jupyter-lab servers).
+    Default: Uses port from .env.jupyter, or 9999 if no config exists.
+
 ${YELLOW}EXAMPLES:${NC}
-    notellm stop              # Stop server using PID file
-    notellm stop -p 9999      # Stop server on port 9999
-    notellm stop --force      # Force kill if needed
+    notellm stop         # Stop server on configured port
+    notellm stop -p 8888 # Stop all processes on port 8888
 
 EOF
                 exit 0
@@ -568,105 +581,66 @@ EOF
 
     banner "Stopping JupyterLab"
 
-    # If port specified, stop by port instead of PID file
-    if [ -n "$port" ]; then
-        log_step "Stopping server on port $port..."
-
-        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
-            log_warn "No server running on port $port"
-            exit 0
-        fi
-
-        local pid=$(lsof -Pi :$port -sTCP:LISTEN -t)
-        if [ -n "$pid" ]; then
-            log_info "Found process $pid on port $port"
-            echo -n "  Sending SIGTERM..."
-            kill -TERM "$pid" 2>/dev/null || true
-
-            local count=0
-            while is_process_running "$pid" && [ $count -lt 10 ]; do
-                echo -n "."
-                sleep 1
-                ((count++))
-            done
-            echo ""
-
-            if is_process_running "$pid"; then
-                if [ "$force" = true ]; then
-                    log_warn "Forcing shutdown..."
-                    kill -KILL "$pid" 2>/dev/null || true
-                    sleep 1
-                else
-                    log_error "Graceful shutdown timed out. Use --force to kill."
-                    exit 1
-                fi
-            fi
-
-            log_info "Server on port $port stopped"
-        fi
-        exit 0
-    fi
-
-    # Otherwise use PID file method (original behavior)
-    if [ ! -f "$PID_FILE" ]; then
-        log_warn "No PID file found. Server may not be running."
-
+    # Determine which port to use
+    if [ -z "$port" ]; then
+        # Try to read from config, otherwise use default
         if [ -f "$CONFIG_FILE" ]; then
             source "$CONFIG_FILE"
-            if lsof -Pi :${JUPYTER_PORT:-9999} -sTCP:LISTEN -t >/dev/null 2>&1; then
-                log_warn "Something is on port ${JUPYTER_PORT:-9999}"
-                echo ""
-                echo "To stop it: notellm stop -p ${JUPYTER_PORT:-9999}"
-            fi
+            port="${JUPYTER_PORT:-9999}"
+        else
+            port="9999"
         fi
-
-        exit 0
     fi
-    
-    local pid=$(cat "$PID_FILE")
-    
-    if ! is_process_running "$pid"; then
-        log_warn "Process $pid not running (stale PID file)"
+
+    log_step "Stopping all processes on port $port..."
+
+    # Get all process groups using this port (includes parent processes)
+    local pids=$(ps aux | grep -E "(jupyter|uv).*--port[= ]${port}" | grep -v grep | awk '{print $2}')
+
+    if [ -z "$pids" ]; then
+        log_warn "No Jupyter processes found on port $port"
         rm -f "$PID_FILE"
         exit 0
     fi
-    
-    log_info "Found JupyterLab (PID: $pid)"
-    
-    echo -n "  Sending SIGTERM..."
-    kill -TERM "$pid" 2>/dev/null || true
-    
-    local count=0
-    while is_process_running "$pid" && [ $count -lt 10 ]; do
-        echo -n "."
-        sleep 1
-        ((count++))
+
+    log_info "Found processes: $pids"
+
+    # Send SIGTERM to all
+    for pid in $pids; do
+        kill -TERM "$pid" 2>/dev/null && log_info "Sent SIGTERM to PID $pid" || true
     done
-    echo ""
 
-    if is_process_running "$pid"; then
-        if [ "$force" = true ]; then
-            log_warn "Forcing shutdown..."
+    # Wait up to 10 seconds for graceful shutdown
+    log_info "Waiting for graceful shutdown..."
+    sleep 10
+
+    # Force kill any survivors
+    for pid in $pids; do
+        if ps -p "$pid" >/dev/null 2>&1; then
+            log_warn "Force killing PID $pid"
             kill -KILL "$pid" 2>/dev/null || true
-            sleep 1
-
-            if is_process_running "$pid"; then
-                log_error "Failed to stop process $pid"
-                exit 1
-            fi
-        else
-            log_error "Graceful shutdown timed out"
-            echo ""
-            echo "Try: notellm stop --force"
-            exit 1
         fi
-    fi
-    
-    rm -f "$PID_FILE"
-    log_info "JupyterLab stopped"
+    done
 
-    echo ""
-    echo "To restart: notellm start"
+    sleep 1
+
+    # Check results
+    local failed=false
+    for pid in $pids; do
+        if ps -p "$pid" >/dev/null 2>&1; then
+            log_error "Failed to kill PID $pid"
+            failed=true
+        fi
+    done
+
+    if [ "$failed" = false ]; then
+        log_info "All processes stopped"
+    fi
+
+    # Clean up PID file
+    rm -f "$PID_FILE"
+
+    log_info "All processes on port $port stopped"
     echo ""
 }
 
@@ -685,18 +659,27 @@ cmd_status() {
         echo ""
 
         # Check if PID file exists and process is running
-        if [ -f "$PID_FILE" ] && is_jupyter_running; then
-            local pid=$(cat "$PID_FILE")
-            log_info "Server is RUNNING (PID: $pid)"
-            echo ""
+        if [ -f "$PID_FILE" ]; then
+            if is_jupyter_running; then
+                local pid=$(cat "$PID_FILE")
+                log_info "Server is RUNNING (PID: $pid)"
+                echo ""
 
-            # Display URLs based on host configuration
-            if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
-                local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
-                echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-                echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+                # Display URLs based on host configuration
+                if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+                    local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+                    echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+                    echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+                else
+                    echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+                fi
             else
-                echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+                # PID file exists but process not running or not listening - clean up
+                log_warn "Server is STOPPED (cleaning up stale PID file)"
+                rm -f "$PID_FILE"
+                echo ""
+                echo "  Port configured: ${JUPYTER_PORT}"
+                echo "  Host configured: ${JUPYTER_HOST}"
             fi
         else
             log_warn "Server is STOPPED"
@@ -767,12 +750,12 @@ ${YELLOW}USAGE:${NC}
     notellm clean [options]
 
 ${YELLOW}OPTIONS:${NC}
-    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md
+    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md, .jupyter*
     -h, --help  Show this help
 
 ${YELLOW}BEHAVIOR:${NC}
     Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log
-    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md
+    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md, .jupyter_ystore.db
 
     User files are preserved: notebooks/, data/, src/, figures/, *.ipynb
 
@@ -813,6 +796,17 @@ EOF
         [ -f "uv.lock" ] && files_to_remove+=("uv.lock")
         [ -f "pyproject.toml" ] && files_to_remove+=("pyproject.toml")
         [ -f "CLAUDE.md" ] && files_to_remove+=("CLAUDE.md")
+
+        # Add all .jupyter* files and directories (except .jupyter.pid and .jupyter.log which are already included)
+        for item in .jupyter*; do
+            if [ -e "$item" ] && [ "$item" != "$PID_FILE" ] && [ "$item" != "$LOG_FILE" ]; then
+                if [ -d "$item" ]; then
+                    files_to_remove+=("$item/")
+                else
+                    files_to_remove+=("$item")
+                fi
+            fi
+        done
     fi
 
     if [ ${#files_to_remove[@]} -eq 0 ]; then

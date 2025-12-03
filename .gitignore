@@ -14,3 +14,8 @@ __pycache__/
 
 # Testing
 .pytest_cache/
+
+# Claude Code
+.claude
+
+# emacs

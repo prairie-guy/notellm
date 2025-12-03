@@ -1,0 +1,20 @@
+(undo-tree-save-format-version . 1)
+"f6369b8deac9cc220b7c0030d0235e6f7160a6c8"
+[nil nil nil nil (26928 39819 387372 975000) 0 nil]
+([nil nil ((127 . 128) (t 26927 49415 0 0)) nil (26928 39819 387371 855000) 0 nil])
+([nil nil ((128 . 135)) nil (26928 39819 387370 675000) 0 nil])
+([nil nil ((#("s" 0 1 (face font-lock-comment-face ws-butler-chg chg fontified t)) . -133) (undo-tree-id8 . -1) (undo-tree-id9 . -1) (#("e" 0 1 (face font-lock-comment-face ws-butler-chg chg fontified t)) . -134) (undo-tree-id10 . -1) (undo-tree-id11 . -1) 135) nil (26928 39819 387369 95000) 0 nil])
+([nil nil ((#("u" 0 1 (face font-lock-comment-face ws-butler-chg chg fontified t)) . -132) (undo-tree-id6 . -1) (undo-tree-id7 . -1) 133) nil (26928 39819 387363 595000) 0 nil])
+([nil nil ((132 . 140)) nil (26928 39819 387355 915000) 0 nil])
+([nil nil ((#("e" 0 1 (face font-lock-comment-face ws-butler-chg chg fontified t)) . -139) (undo-tree-id4 . -1) (undo-tree-id5 . -1) 140) nil (26928 39819 387354 595000) 0 nil])
+([nil nil ((139 . 141)) nil (26928 39819 387351 595000) 0 nil])
+([nil nil ((#("
+" 0 1 (face font-lock-comment-face ws-butler-chg chg fontified nil)) . 144) (142 . 144) (141 . 143)) nil (26928 39819 387349 915000) 0 nil])
+([nil nil ((#("#" 0 1 (face font-lock-comment-face ws-butler-chg chg fontified t)) . -142) (undo-tree-id0 . -1) (undo-tree-id1 . -1) (#(" " 0 1 (face font-lock-comment-face ws-butler-chg chg fontified t)) . -143) (undo-tree-id2 . -1) (undo-tree-id3 . -1) 144) nil (26928 39819 387345 515000) 0 nil])
+([nil nil ((nil rear-nonsticky nil 148 . 149) (nil fontified nil 142 . 149) (142 . 149) (t 26928 39819 388220 907000)) nil (26928 39885 571582 993000) 0 nil])
+([nil nil ((149 . 151)) nil (26928 39885 571580 873000) 0 nil])
+([nil nil ((151 . 158)) nil (26928 39885 571579 453000) 0 nil])
+([nil nil ((#("
+" 0 1 (fontified nil ws-butler-chg chg face font-lock-comment-face)) . 161) (159 . 161) (158 . 160)) nil (26928 39885 571577 73000) 0 nil])
+([nil current ((#("#" 0 1 (fontified t ws-butler-chg chg face font-lock-comment-face)) . -159) (undo-tree-id0 . -1) (#(" " 0 1 (fontified t ws-butler-chg chg face font-lock-comment-face)) . -160) (undo-tree-id1 . -1) 161) nil (26928 39885 571571 313000) 0 nil])
+nil
