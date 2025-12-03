@@ -127,7 +127,7 @@ ${YELLOW}NEW OPTIONS:${NC}
 
 ${YELLOW}EXAMPLES:${NC}
     notellm start                   # Start with defaults (auto-init if needed)
-    notellm start -p 8888           # Start on port 8888
+    notellm start -p 9998           # Start on port 9998
     notellm start --host myserver   # Start with custom hostname
     notellm stop                    # Stop the server
     notellm stop -p 9999            # Stop server on port 9999
@@ -212,7 +212,7 @@ do_init() {
     if ! check_port_available "$port"; then
         log_error "Port $port is already in use"
         echo ""
-        echo "Try a different port: notellm init --port 8888"
+        echo "Try a different port: notellm start --port 9998"
         echo "Or find what's using it: lsof -i :$port"
         exit 1
     fi
@@ -243,9 +243,7 @@ do_init() {
     
     cp "$INSTALL_DIR/templates/pyproject.toml" .
     cp "$INSTALL_DIR/templates/CLAUDE.md" .
-    cp "$INSTALL_DIR/templates/install.sh" .
-    chmod +x install.sh
-    
+
     log_info "Templates copied"
     
     # Generate .env.jupyter
@@ -385,7 +383,7 @@ ${YELLOW}BEHAVIOR:${NC}
 
 ${YELLOW}EXAMPLES:${NC}
     notellm start                      # Use existing config or init with defaults
-    notellm start --port 8888          # Reinitialize with port 8888
+    notellm start --port 9998          # Reinitialize with port 9998
     notellm start --host myserver      # Reinitialize with hostname
 
 EOF
@@ -462,6 +460,7 @@ EOF
         uv run jupyter lab \
             --ip "$JUPYTER_HOST" \
             --port "$JUPYTER_PORT" \
+            --port-retries=0 \
             --IdentityProvider.token="$JUPYTER_TOKEN" \
             --ServerApp.allow_remote_access=true \
             --no-browser \
@@ -472,6 +471,7 @@ EOF
         nohup uv run jupyter lab \
             --ip "$JUPYTER_HOST" \
             --port "$JUPYTER_PORT" \
+            --port-retries=0 \
             --IdentityProvider.token="$JUPYTER_TOKEN" \
             --ServerApp.allow_remote_access=true \
             --no-browser \

@@ -86,7 +86,7 @@ Initialize workspace (if needed) and start JupyterLab server.
 
 ```bash
 notellm start                      # Use defaults or existing config
-notellm start --port 8888          # Reinitialize with custom port
+notellm start --port 9998          # Reinitialize with custom port
 notellm start --host myserver      # Reinitialize with hostname
 notellm start --token mysecret     # Reinitialize with custom token
 notellm start --foreground         # Run in foreground (Ctrl+C to stop)
