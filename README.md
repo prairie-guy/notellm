@@ -112,8 +112,44 @@ Stop the JupyterLab server.
 notellm stop              # Graceful shutdown (uses PID file)
 notellm stop --port 9999  # Stop server on specific port
 notellm stop --force      # Force kill if needed
-notellm stop --clean      # Also remove log files
 ```
+
+### `notellm status`
+
+Show the status of the configured server and all running Jupyter Lab instances.
+
+```bash
+notellm status
+```
+
+**Displays:**
+- Current directory's configured server (if exists) with URLs and running status
+- All Jupyter Lab processes running system-wide with their PIDs and ports
+- Helpful for troubleshooting when multiple servers are running
+
+### `notellm clean`
+
+Remove configuration files from the workspace.
+
+```bash
+notellm clean             # Remove config files only
+notellm clean --purge     # Remove everything including dependencies
+```
+
+**Default behavior:**
+- Removes: `.env.jupyter`, `.mcp.json`, `.jupyter.pid`, `.jupyter.log`
+- Refuses to clean if server is running (run `notellm stop` first)
+- Preserves all user files and directories
+
+**With --purge:**
+- Also removes: `.venv/`, `uv.lock`, `pyproject.toml`, `CLAUDE.md`
+- Requires confirmation before proceeding
+- Use when you want to completely reset the workspace
+
+**Always preserved:**
+- User directories: `notebooks/`, `data/`, `src/`, `figures/`
+- Jupyter notebooks: All `*.ipynb` files
+- Any other user-created files
 
 ### `notellm new`
 

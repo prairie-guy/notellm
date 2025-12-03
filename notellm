@@ -105,6 +105,8 @@ ${YELLOW}USAGE:${NC}
 ${YELLOW}COMMANDS:${NC}
     start [options]     Initialize (if needed) and start JupyterLab server
     stop [options]      Stop JupyterLab server
+    status              Show configured server and all running Jupyter Lab instances
+    clean [options]     Remove configuration files
     new <name>          Create a new notebook with boilerplate
     update              Update notellm to latest version
     version             Show version information
@@ -119,7 +121,9 @@ ${YELLOW}START OPTIONS:${NC}
 ${YELLOW}STOP OPTIONS:${NC}
     -p, --port PORT     Stop server on specific port
     -f, --force         Force kill if graceful shutdown fails
-    -c, --clean         Remove log and pid files
+
+${YELLOW}CLEAN OPTIONS:${NC}
+    --purge             Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md
 
 ${YELLOW}NEW OPTIONS:${NC}
     -d, --dir DIR       Directory for notebook (default: notebooks/)
@@ -129,8 +133,11 @@ ${YELLOW}EXAMPLES:${NC}
     notellm start                   # Start with defaults (auto-init if needed)
     notellm start -p 9998           # Start on port 9998
     notellm start --host myserver   # Start with custom hostname
+    notellm status                  # Show server status and running instances
     notellm stop                    # Stop the server
     notellm stop -p 9999            # Stop server on port 9999
+    notellm clean                   # Remove config files
+    notellm clean --purge           # Remove config + dependencies
     notellm new my_analysis         # Create notebooks/my_analysis.ipynb
 
 ${YELLOW}WORKFLOW:${NC}
@@ -440,7 +447,6 @@ EOF
         fi
         echo ""
         echo "  To stop:    notellm stop"
-        echo "  To restart: notellm stop && notellm start"
         exit 0
     fi
     
@@ -521,17 +527,12 @@ EOF
 
 cmd_stop() {
     local force=false
-    local clean=false
     local port=""
 
     while [[ $# -gt 0 ]]; do
         case $1 in
             -f|--force)
                 force=true
-                shift
-                ;;
-            -c|--clean)
-                clean=true
                 shift
                 ;;
             -p|--port)
@@ -548,7 +549,6 @@ ${YELLOW}USAGE:${NC}
 ${YELLOW}OPTIONS:${NC}
     -p, --port PORT Port to stop server on (bypasses PID file)
     -f, --force     Force kill if graceful shutdown fails
-    -c, --clean     Remove log and pid files after stopping
     -h, --help      Show this help
 
 ${YELLOW}EXAMPLES:${NC}
@@ -577,7 +577,7 @@ EOF
             exit 0
         fi
 
-        local pid=$(lsof -t -i :$port)
+        local pid=$(lsof -Pi :$port -sTCP:LISTEN -t)
         if [ -n "$pid" ]; then
             log_info "Found process $pid on port $port"
             echo -n "  Sending SIGTERM..."
@@ -603,7 +603,6 @@ EOF
             fi
 
             log_info "Server on port $port stopped"
-            [ "$clean" = true ] && rm -f "$PID_FILE" "$LOG_FILE" 2>/dev/null
         fi
         exit 0
     fi
@@ -621,7 +620,6 @@ EOF
             fi
         fi
 
-        [ "$clean" = true ] && rm -f "$PID_FILE" "$LOG_FILE" 2>/dev/null
         exit 0
     fi
     
@@ -630,7 +628,6 @@ EOF
     if ! is_process_running "$pid"; then
         log_warn "Process $pid not running (stale PID file)"
         rm -f "$PID_FILE"
-        [ "$clean" = true ] && rm -f "$LOG_FILE" 2>/dev/null
         exit 0
     fi
     
@@ -646,13 +643,13 @@ EOF
         ((count++))
     done
     echo ""
-    
+
     if is_process_running "$pid"; then
         if [ "$force" = true ]; then
             log_warn "Forcing shutdown..."
             kill -KILL "$pid" 2>/dev/null || true
             sleep 1
-            
+
             if is_process_running "$pid"; then
                 log_error "Failed to stop process $pid"
                 exit 1
@@ -667,14 +664,199 @@ EOF
     
     rm -f "$PID_FILE"
     log_info "JupyterLab stopped"
-    
-    if [ "$clean" = true ]; then
-        rm -f "$LOG_FILE" 2>/dev/null
-        log_info "Cleaned up log files"
-    fi
-    
+
     echo ""
     echo "To restart: notellm start"
+    echo ""
+}
+
+#######################################
+# Command: status
+#######################################
+
+cmd_status() {
+    banner "JupyterLab Status"
+
+    # Check if local config exists
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+
+        log_step "Configured Server (in current directory)"
+        echo ""
+
+        # Check if PID file exists and process is running
+        if [ -f "$PID_FILE" ] && is_jupyter_running; then
+            local pid=$(cat "$PID_FILE")
+            log_info "Server is RUNNING (PID: $pid)"
+            echo ""
+
+            # Display URLs based on host configuration
+            if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+                local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+                echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+                echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+            else
+                echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+            fi
+        else
+            log_warn "Server is STOPPED"
+            echo ""
+            echo "  Port configured: ${JUPYTER_PORT}"
+            echo "  Host configured: ${JUPYTER_HOST}"
+        fi
+        echo ""
+    else
+        log_warn "No configuration in current directory"
+        echo ""
+        echo "Run 'notellm start' to initialize and start a server"
+        echo ""
+    fi
+
+    # Find all running jupyter-lab processes system-wide
+    log_step "All Running Jupyter Lab Instances"
+    echo ""
+
+    # Get all jupyter-lab processes with their ports
+    local jupyter_procs=$(ps aux | grep -E '[j]upyter-lab|[j]upyter lab' | grep -v grep)
+
+    if [ -z "$jupyter_procs" ]; then
+        log_info "No Jupyter Lab instances running"
+    else
+        # Get PIDs and find their ports
+        local pids=$(echo "$jupyter_procs" | awk '{print $2}')
+        local found_any=false
+
+        for pid in $pids; do
+            # Find ports this process is listening on
+            local ports=$(lsof -Pan -p "$pid" -iTCP -sTCP:LISTEN 2>/dev/null | awk '{print $9}' | grep -oE '[0-9]+$' | sort -u)
+
+            if [ -n "$ports" ]; then
+                found_any=true
+                local cmd=$(ps -p "$pid" -o args= | head -c 80)
+                echo -e "  ${GREEN}●${NC} PID: $pid"
+                echo "    Ports: $(echo $ports | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')"
+                echo "    Command: $cmd..."
+                echo ""
+            fi
+        done
+
+        if [ "$found_any" = false ]; then
+            log_warn "Found Jupyter processes but none are listening on ports"
+        fi
+    fi
+}
+
+#######################################
+# Command: clean
+#######################################
+
+cmd_clean() {
+    local purge=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --purge)
+                purge=true
+                shift
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}notellm clean${NC} - Remove configuration files
+
+${YELLOW}USAGE:${NC}
+    notellm clean [options]
+
+${YELLOW}OPTIONS:${NC}
+    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md
+    -h, --help  Show this help
+
+${YELLOW}BEHAVIOR:${NC}
+    Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log
+    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md
+
+    User files are preserved: notebooks/, data/, src/, figures/, *.ipynb
+
+${YELLOW}EXAMPLES:${NC}
+    notellm clean           # Remove config files only
+    notellm clean --purge   # Remove everything (requires confirmation)
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    banner "Cleaning workspace"
+
+    # Check if server is running
+    if [ -f "$PID_FILE" ] && is_jupyter_running; then
+        log_error "Server is currently running"
+        echo ""
+        echo "Stop it first: notellm stop"
+        exit 1
+    fi
+
+    # List what will be removed
+    local files_to_remove=()
+
+    [ -f "$CONFIG_FILE" ] && files_to_remove+=("$CONFIG_FILE")
+    [ -f ".mcp.json" ] && files_to_remove+=(".mcp.json")
+    [ -f "$PID_FILE" ] && files_to_remove+=("$PID_FILE")
+    [ -f "$LOG_FILE" ] && files_to_remove+=("$LOG_FILE")
+
+    if [ "$purge" = true ]; then
+        [ -d ".venv" ] && files_to_remove+=(".venv/")
+        [ -f "uv.lock" ] && files_to_remove+=("uv.lock")
+        [ -f "pyproject.toml" ] && files_to_remove+=("pyproject.toml")
+        [ -f "CLAUDE.md" ] && files_to_remove+=("CLAUDE.md")
+    fi
+
+    if [ ${#files_to_remove[@]} -eq 0 ]; then
+        log_info "Nothing to clean (files already removed)"
+        exit 0
+    fi
+
+    echo ""
+    echo "The following will be removed:"
+    for file in "${files_to_remove[@]}"; do
+        echo "  - $file"
+    done
+    echo ""
+
+    # Confirmation for purge
+    if [ "$purge" = true ]; then
+        echo -e "${YELLOW}Warning:${NC} --purge will remove dependencies (requires re-download)"
+        echo -n "Continue? (y/N): "
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]$ ]]; then
+            log_warn "Clean cancelled"
+            exit 0
+        fi
+        echo ""
+    fi
+
+    # Remove files
+    log_step "Removing files..."
+
+    for file in "${files_to_remove[@]}"; do
+        if [ -d "$file" ]; then
+            rm -rf "$file"
+            log_info "Removed $file"
+        elif [ -f "$file" ]; then
+            rm -f "$file"
+            log_info "Removed $file"
+        fi
+    done
+
+    echo ""
+    log_info "Workspace cleaned"
+    echo ""
+    echo "User files preserved: notebooks/, data/, src/, figures/, *.ipynb"
+    echo "To reinitialize: notellm start"
     echo ""
 }
 
@@ -937,6 +1119,12 @@ case "$command" in
         ;;
     stop)
         cmd_stop "$@"
+        ;;
+    status)
+        cmd_status
+        ;;
+    clean)
+        cmd_clean "$@"
         ;;
     new)
         cmd_new "$@"
