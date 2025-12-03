@@ -1,0 +1,877 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+#######################################
+# notellm - Jupyter + Claude Code Workspace Manager
+# https://github.com/prairie-guy/notellm
+#######################################
+
+VERSION="1.0.0"
+INSTALL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/notellm"
+CONFIG_FILE=".env.jupyter"
+PID_FILE=".jupyter.pid"
+LOG_FILE=".jupyter.log"
+NOTEBOOKS_DIR="notebooks"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# Default configuration
+DEFAULT_PORT=9999
+DEFAULT_TOKEN="notellm-$(date +%s | shasum | head -c 16)"
+
+#######################################
+# Utility functions
+#######################################
+
+log_info() {
+    echo -e "${GREEN}✓${NC} $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}✗${NC} $1"
+}
+
+log_step() {
+    echo -e "${BLUE}▶${NC} $1"
+}
+
+banner() {
+    echo -e "${CYAN}"
+    echo "╔════════════════════════════════════════════╗"
+    echo "║  $1"
+    echo "╚════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
+
+check_port_available() {
+    local port=$1
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+        return 1
+    fi
+    return 0
+}
+
+is_jupyter_running() {
+    if [ -f "$PID_FILE" ]; then
+        local pid=$(cat "$PID_FILE")
+        if ps -p "$pid" > /dev/null 2>&1; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+is_process_running() {
+    local pid=$1
+    ps -p "$pid" > /dev/null 2>&1
+}
+
+require_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        log_error "Not a notellm project (no $CONFIG_FILE found)"
+        echo ""
+        echo "Run 'notellm init' first to set up this directory."
+        exit 1
+    fi
+}
+
+name_to_title() {
+    echo "$1" | sed 's/_/ /g' | sed 's/-/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1'
+}
+
+#######################################
+# Command: help
+#######################################
+
+cmd_help() {
+    cat << EOF
+${BOLD}notellm${NC} - Jupyter + Claude Code Workspace Manager
+
+${YELLOW}USAGE:${NC}
+    notellm <command> [options]
+
+${YELLOW}COMMANDS:${NC}
+    init [options]      Initialize a new workspace in current directory
+    start [options]     Start JupyterLab server
+    stop [options]      Stop JupyterLab server
+    new <name>          Create a new notebook with boilerplate
+    update              Update notellm to latest version
+    version             Show version information
+    help                Show this help message
+
+${YELLOW}INIT OPTIONS:${NC}
+    -t, --token TOKEN   Authentication token (default: auto-generated)
+    -p, --port PORT     JupyterLab port (default: 9999)
+
+${YELLOW}START OPTIONS:${NC}
+    -f, --foreground    Run server in foreground
+
+${YELLOW}STOP OPTIONS:${NC}
+    -f, --force         Force kill if graceful shutdown fails
+    -c, --clean         Remove log and pid files
+
+${YELLOW}NEW OPTIONS:${NC}
+    -d, --dir DIR       Directory for notebook (default: notebooks/)
+    -o, --open          Open in browser after creation
+
+${YELLOW}EXAMPLES:${NC}
+    notellm init                    # Set up workspace with defaults
+    notellm init -p 8888            # Use custom port
+    notellm start                   # Start Jupyter server
+    notellm new my_analysis         # Create notebooks/my_analysis.ipynb
+    notellm new exploration -d .    # Create in current directory
+    notellm stop                    # Stop the server
+
+${YELLOW}WORKFLOW:${NC}
+    1. cd ~/my-project
+    2. notellm init
+    3. notellm start
+    4. notellm new analysis
+    5. Open JupyterLab (URL shown) in one half of screen
+    6. Run 'claude' in terminal on other half
+    7. notellm stop (when done)
+
+EOF
+}
+
+#######################################
+# Command: version
+#######################################
+
+cmd_version() {
+    echo "notellm version $VERSION"
+    echo "Install location: $INSTALL_DIR"
+}
+
+#######################################
+# Command: update
+#######################################
+
+cmd_update() {
+    banner "Updating notellm"
+    
+    if [ ! -d "$INSTALL_DIR/.git" ]; then
+        log_error "Install directory is not a git repository"
+        echo "Reinstall with: git clone https://github.com/prairie-guy/notellm.git && cd notellm && ./setup.sh"
+        exit 1
+    fi
+    
+    log_step "Pulling latest changes..."
+    git -C "$INSTALL_DIR" pull
+    
+    log_info "Update complete"
+    echo ""
+    notellm version
+}
+
+#######################################
+# Command: init
+#######################################
+
+cmd_init() {
+    local token=""
+    local port=""
+    
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -t|--token)
+                token="$2"
+                shift 2
+                ;;
+            -p|--port)
+                port="$2"
+                shift 2
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}notellm init${NC} - Initialize workspace
+
+${YELLOW}USAGE:${NC}
+    notellm init [options]
+
+${YELLOW}OPTIONS:${NC}
+    -t, --token TOKEN   Authentication token for JupyterLab and MCP
+                        Default: auto-generated secure token
+    -p, --port PORT     Port for JupyterLab server
+                        Default: 9999
+    -h, --help          Show this help
+
+${YELLOW}CREATES:${NC}
+    .env.jupyter        Configuration (port, token)
+    .mcp.json           Claude Code MCP server config
+    pyproject.toml      Python dependencies
+    CLAUDE.md           Instructions for Claude Code
+    notebooks/          Notebook directory
+    data/               Data directory
+    figures/            Saved visualizations
+    src/                Python modules
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Set defaults
+    token="${token:-$DEFAULT_TOKEN}"
+    port="${port:-$DEFAULT_PORT}"
+    
+    banner "Initializing notellm workspace"
+    
+    # Validate port
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ]; then
+        log_error "Invalid port: $port (must be 1024-65535)"
+        exit 1
+    fi
+    
+    # Check if port is available
+    if ! check_port_available "$port"; then
+        log_error "Port $port is already in use"
+        echo ""
+        echo "Try a different port: notellm init --port 8888"
+        echo "Or find what's using it: lsof -i :$port"
+        exit 1
+    fi
+    
+    log_info "Port $port is available"
+    
+    # Check for uv
+    log_step "Checking for uv..."
+    if ! command -v uv &> /dev/null; then
+        log_warn "uv not found. Installing..."
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        log_info "uv installed"
+        
+        if [ -f "$HOME/.local/bin/env" ]; then
+            source "$HOME/.local/bin/env"
+        fi
+    fi
+    log_info "uv found: $(uv --version)"
+    
+    # Copy templates
+    log_step "Copying template files..."
+    
+    if [ ! -d "$INSTALL_DIR/templates" ]; then
+        log_error "Templates not found at $INSTALL_DIR/templates"
+        echo "Try: notellm update"
+        exit 1
+    fi
+    
+    cp "$INSTALL_DIR/templates/pyproject.toml" .
+    cp "$INSTALL_DIR/templates/CLAUDE.md" .
+    cp "$INSTALL_DIR/templates/install.sh" .
+    chmod +x install.sh
+    
+    log_info "Templates copied"
+    
+    # Generate .env.jupyter
+    log_step "Generating configuration..."
+    cat > "$CONFIG_FILE" << EOF
+# notellm configuration
+# Generated: $(date)
+JUPYTER_PORT=${port}
+JUPYTER_TOKEN=${token}
+EOF
+    
+    log_info "Created $CONFIG_FILE"
+    
+    # Generate .mcp.json
+    cat > .mcp.json << EOF
+{
+  "mcpServers": {
+    "jupyter": {
+      "command": "uvx",
+      "args": ["jupyter-mcp-server@latest"],
+      "env": {
+        "JUPYTER_URL": "http://localhost:${port}",
+        "JUPYTER_TOKEN": "${token}",
+        "ALLOW_IMG_OUTPUT": "true"
+      }
+    }
+  }
+}
+EOF
+    
+    log_info "Created .mcp.json"
+    
+    # Update CLAUDE.md with actual values
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        sed -i '' "s/{{PORT}}/${port}/g" CLAUDE.md
+        sed -i '' "s/{{TOKEN}}/${token}/g" CLAUDE.md
+    else
+        sed -i "s/{{PORT}}/${port}/g" CLAUDE.md
+        sed -i "s/{{TOKEN}}/${token}/g" CLAUDE.md
+    fi
+    
+    log_info "Updated CLAUDE.md"
+    
+    # Create directory structure
+    log_step "Creating directories..."
+    mkdir -p notebooks data src figures
+    log_info "Created notebooks/, data/, src/, figures/"
+    
+    # Create .gitignore
+    if [ ! -f .gitignore ]; then
+        log_step "Creating .gitignore..."
+        cat > .gitignore << 'EOF'
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.jupyter
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+.jupyter.pid
+.jupyter.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+EOF
+        log_info "Created .gitignore"
+    fi
+    
+    # Install dependencies
+    log_step "Installing Python dependencies..."
+    uv sync
+    log_info "Dependencies installed"
+    
+    # Summary
+    echo ""
+    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║            Workspace Ready!                    ║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Configuration:${NC}"
+    echo "  Port:  $port"
+    echo "  Token: $token"
+    echo ""
+    echo -e "${YELLOW}Next steps:${NC}"
+    echo -e "  ${CYAN}notellm start${NC}           # Start JupyterLab"
+    echo -e "  ${CYAN}notellm new analysis${NC}    # Create a notebook"
+    echo -e "  ${CYAN}claude${NC}                  # Start Claude Code (other terminal)"
+    echo ""
+}
+
+#######################################
+# Command: start
+#######################################
+
+cmd_start() {
+    local foreground=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -f|--foreground)
+                foreground=true
+                shift
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}notellm start${NC} - Start JupyterLab server
+
+${YELLOW}USAGE:${NC}
+    notellm start [options]
+
+${YELLOW}OPTIONS:${NC}
+    -f, --foreground    Run in foreground (default: background)
+    -h, --help          Show this help
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    require_config
+    source "$CONFIG_FILE"
+    
+    banner "Starting JupyterLab"
+    
+    # Check if already running
+    if is_jupyter_running; then
+        log_warn "JupyterLab is already running (PID: $(cat $PID_FILE))"
+        echo ""
+        echo "  URL: http://localhost:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        echo ""
+        echo "  To stop:    notellm stop"
+        echo "  To restart: notellm stop && notellm start"
+        exit 0
+    fi
+    
+    # Check port
+    if ! check_port_available "$JUPYTER_PORT"; then
+        log_error "Port $JUPYTER_PORT is in use"
+        echo ""
+        echo "Find what's using it: lsof -i :$JUPYTER_PORT"
+        exit 1
+    fi
+    
+    log_info "Port $JUPYTER_PORT is available"
+    
+    if [ "$foreground" = true ]; then
+        log_info "Starting in foreground (Ctrl+C to stop)..."
+        echo ""
+        uv run jupyter lab \
+            --port "$JUPYTER_PORT" \
+            --IdentityProvider.token="$JUPYTER_TOKEN" \
+            --no-browser \
+            --notebook-dir=.
+    else
+        log_step "Starting in background..."
+        
+        nohup uv run jupyter lab \
+            --port "$JUPYTER_PORT" \
+            --IdentityProvider.token="$JUPYTER_TOKEN" \
+            --no-browser \
+            --notebook-dir=. \
+            > "$LOG_FILE" 2>&1 &
+        
+        echo $! > "$PID_FILE"
+        sleep 2
+        
+        if is_jupyter_running; then
+            log_info "JupyterLab started (PID: $(cat $PID_FILE))"
+        else
+            log_error "Failed to start. Check $LOG_FILE"
+            exit 1
+        fi
+        
+        echo ""
+        echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
+        echo -e "${GREEN}║            JupyterLab Running                  ║${NC}"
+        echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
+        echo ""
+        echo -e "${YELLOW}URL:${NC} http://localhost:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        echo ""
+        echo -e "${YELLOW}Next:${NC}"
+        echo -e "  ${CYAN}notellm new my_analysis${NC}   # Create notebook"
+        echo -e "  ${CYAN}claude${NC}                    # Start Claude Code"
+        echo -e "  ${CYAN}notellm stop${NC}              # Stop server"
+        echo ""
+        echo -e "${YELLOW}Logs:${NC} $LOG_FILE"
+        echo ""
+    fi
+}
+
+#######################################
+# Command: stop
+#######################################
+
+cmd_stop() {
+    local force=false
+    local clean=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -f|--force)
+                force=true
+                shift
+                ;;
+            -c|--clean)
+                clean=true
+                shift
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}notellm stop${NC} - Stop JupyterLab server
+
+${YELLOW}USAGE:${NC}
+    notellm stop [options]
+
+${YELLOW}OPTIONS:${NC}
+    -f, --force     Force kill if graceful shutdown fails
+    -c, --clean     Remove log and pid files after stopping
+    -h, --help      Show this help
+
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    
+    banner "Stopping JupyterLab"
+    
+    if [ ! -f "$PID_FILE" ]; then
+        log_warn "No PID file found. Server may not be running."
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE"
+            if lsof -Pi :${JUPYTER_PORT:-9999} -sTCP:LISTEN -t >/dev/null 2>&1; then
+                log_warn "Something is on port ${JUPYTER_PORT:-9999}"
+                echo ""
+                echo "To stop it manually:"
+                echo "  kill \$(lsof -t -i :${JUPYTER_PORT:-9999})"
+            fi
+        fi
+        
+        [ "$clean" = true ] && rm -f "$PID_FILE" "$LOG_FILE" 2>/dev/null
+        exit 0
+    fi
+    
+    local pid=$(cat "$PID_FILE")
+    
+    if ! is_process_running "$pid"; then
+        log_warn "Process $pid not running (stale PID file)"
+        rm -f "$PID_FILE"
+        [ "$clean" = true ] && rm -f "$LOG_FILE" 2>/dev/null
+        exit 0
+    fi
+    
+    log_info "Found JupyterLab (PID: $pid)"
+    
+    echo -n "  Sending SIGTERM..."
+    kill -TERM "$pid" 2>/dev/null || true
+    
+    local count=0
+    while is_process_running "$pid" && [ $count -lt 10 ]; do
+        echo -n "."
+        sleep 1
+        ((count++))
+    done
+    echo ""
+    
+    if is_process_running "$pid"; then
+        if [ "$force" = true ]; then
+            log_warn "Forcing shutdown..."
+            kill -KILL "$pid" 2>/dev/null || true
+            sleep 1
+            
+            if is_process_running "$pid"; then
+                log_error "Failed to stop process $pid"
+                exit 1
+            fi
+        else
+            log_error "Graceful shutdown timed out"
+            echo ""
+            echo "Try: notellm stop --force"
+            exit 1
+        fi
+    fi
+    
+    rm -f "$PID_FILE"
+    log_info "JupyterLab stopped"
+    
+    if [ "$clean" = true ]; then
+        rm -f "$LOG_FILE" 2>/dev/null
+        log_info "Cleaned up log files"
+    fi
+    
+    echo ""
+    echo "To restart: notellm start"
+    echo ""
+}
+
+#######################################
+# Command: new
+#######################################
+
+cmd_new() {
+    local notebook_name=""
+    local notebook_dir="$NOTEBOOKS_DIR"
+    local open_browser=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -d|--dir)
+                notebook_dir="$2"
+                shift 2
+                ;;
+            -o|--open)
+                open_browser=true
+                shift
+                ;;
+            -h|--help)
+                cat << EOF
+${BOLD}notellm new${NC} - Create new notebook
+
+${YELLOW}USAGE:${NC}
+    notellm new <name> [options]
+
+${YELLOW}ARGUMENTS:${NC}
+    name                Notebook name (extension ignored/replaced)
+
+${YELLOW}OPTIONS:${NC}
+    -d, --dir DIR       Directory (default: notebooks/)
+    -o, --open          Open in browser after creation
+    -h, --help          Show this help
+
+${YELLOW}EXAMPLES:${NC}
+    notellm new my_analysis           # notebooks/my_analysis.ipynb
+    notellm new exploration -d .      # ./exploration.ipynb
+    notellm new data_viz --open       # Create and open in browser
+
+${YELLOW}NOTEBOOK INCLUDES:${NC}
+    - Title (from filename)
+    - Imports: polars, pandas, numpy, altair, matplotlib, seaborn
+    - Configuration: display settings, paths
+    - Data loading placeholder
+
+EOF
+                exit 0
+                ;;
+            -*)
+                log_error "Unknown option: $1"
+                exit 1
+                ;;
+            *)
+                if [ -z "$notebook_name" ]; then
+                    notebook_name="$1"
+                else
+                    log_error "Unexpected argument: $1"
+                    exit 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    if [ -z "$notebook_name" ]; then
+        log_error "Notebook name required"
+        echo ""
+        echo "Usage: notellm new <name>"
+        echo "       notellm new --help"
+        exit 1
+    fi
+    
+    # Clean notebook name
+    local base=$(basename "$notebook_name" .ipynb)
+    base=$(basename "$base" .py)
+    base=$(echo "$base" | sed 's/[^a-zA-Z0-9_-]/_/g')
+    
+    mkdir -p "$notebook_dir"
+    local path="${notebook_dir}/${base}.ipynb"
+    
+    if [ -f "$path" ]; then
+        log_error "Notebook already exists: $path"
+        exit 1
+    fi
+    
+    local title=$(name_to_title "$base")
+    local today=$(date '+%Y-%m-%d')
+    
+    banner "Creating notebook"
+    
+    cat > "$path" << EOF
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# ${title}\\n",
+    "\\n",
+    "---\\n",
+    "\\n",
+    "Created: ${today}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "source": [
+    "# Standard imports\\n",
+    "import polars as pl\\n",
+    "import pandas as pd\\n",
+    "import numpy as np\\n",
+    "\\n",
+    "# Visualization\\n",
+    "import altair as alt\\n",
+    "import matplotlib.pyplot as plt\\n",
+    "import seaborn as sns\\n",
+    "\\n",
+    "# Utilities\\n",
+    "from pathlib import Path\\n",
+    "import warnings"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "source": [
+    "# Configuration\\n",
+    "warnings.filterwarnings('ignore')\\n",
+    "\\n",
+    "# Pandas display\\n",
+    "pd.set_option('display.max_columns', 100)\\n",
+    "pd.set_option('display.max_rows', 100)\\n",
+    "pd.set_option('display.float_format', '{:.2f}'.format)\\n",
+    "\\n",
+    "# Polars display\\n",
+    "pl.Config.set_tbl_rows(20)\\n",
+    "pl.Config.set_fmt_str_lengths(50)\\n",
+    "\\n",
+    "# Matplotlib\\n",
+    "plt.style.use('seaborn-v0_8-whitegrid')\\n",
+    "%matplotlib inline\\n",
+    "\\n",
+    "# Paths\\n",
+    "DATA_DIR = Path('../data')\\n",
+    "FIGURES_DIR = Path('../figures')\\n",
+    "\\n",
+    "print('✓ Setup complete')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Data Loading"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "source": [
+    "# Load your data here\\n",
+    "# df = pl.read_csv(DATA_DIR / 'your_data.csv')\\n",
+    "# df.head()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "source": [
+    "# Claude magic (optional)\\n",
+    "# %load_ext cc_jupyter\\n",
+    "# %🎷 Your prompt here"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "name": "python",
+   "version": "3.12"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
+EOF
+
+    log_info "Created: $path"
+    
+    echo ""
+    echo -e "${YELLOW}Contents:${NC}"
+    echo "  • Title: $title"
+    echo "  • Imports: polars, pandas, numpy, altair, matplotlib, seaborn"
+    echo "  • Config: display options, paths"
+    echo "  • Claude magic placeholder"
+    echo ""
+    
+    # Open in browser
+    if [ "$open_browser" = true ]; then
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE"
+            if is_jupyter_running; then
+                local url="http://localhost:${JUPYTER_PORT}/lab/tree/${path}?token=${JUPYTER_TOKEN}"
+                log_info "Opening in browser..."
+                
+                if command -v xdg-open &> /dev/null; then
+                    xdg-open "$url" 2>/dev/null &
+                elif command -v open &> /dev/null; then
+                    open "$url"
+                else
+                    echo "  $url"
+                fi
+            else
+                log_warn "Server not running. Start with: notellm start"
+            fi
+        fi
+    else
+        if [ -f "$CONFIG_FILE" ] && is_jupyter_running; then
+            source "$CONFIG_FILE"
+            echo -e "${YELLOW}Open in JupyterLab:${NC}"
+            echo "  http://localhost:${JUPYTER_PORT}/lab/tree/${path}"
+        else
+            echo -e "${YELLOW}Start server:${NC} notellm start"
+        fi
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}In Claude Code:${NC}"
+    echo "  > use the notebook $path"
+    echo ""
+}
+
+#######################################
+# Main
+#######################################
+
+if [[ $# -eq 0 ]]; then
+    cmd_help
+    exit 0
+fi
+
+command="$1"
+shift
+
+case "$command" in
+    init)
+        cmd_init "$@"
+        ;;
+    start)
+        cmd_start "$@"
+        ;;
+    stop)
+        cmd_stop "$@"
+        ;;
+    new)
+        cmd_new "$@"
+        ;;
+    update)
+        cmd_update "$@"
+        ;;
+    version|--version|-v)
+        cmd_version
+        ;;
+    help|--help|-h)
+        cmd_help
+        ;;
+    *)
+        log_error "Unknown command: $command"
+        echo ""
+        echo "Run 'notellm help' for usage."
+        exit 1
+        ;;
+esac
