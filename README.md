@@ -1,5 +1,5 @@
 # notellm
-
+ 
 A command-line tool for creating Jupyter + Claude Code workspaces optimized for AI-assisted data science.
 
 **notellm** sets up everything you need to work with JupyterLab and Claude Code side-by-side:
