@@ -14,16 +14,17 @@ LOG_FILE=".jupyter.log"
 NOTEBOOKS_DIR="notebooks"
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-BOLD='\033[1m'
-NC='\033[0m'
+RED=$'\033[0;31m'
+GREEN=$'\033[0;32m'
+YELLOW=$'\033[1;33m'
+BLUE=$'\033[0;34m'
+CYAN=$'\033[0;36m'
+BOLD=$'\033[1m'
+NC=$'\033[0m'
 
 # Default configuration
 DEFAULT_PORT=9999
+DEFAULT_HOST="$(hostname)"
 DEFAULT_TOKEN="notellm-$(date +%s | shasum | head -c 16)"
 
 #######################################
@@ -102,22 +103,21 @@ ${YELLOW}USAGE:${NC}
     notellm <command> [options]
 
 ${YELLOW}COMMANDS:${NC}
-    init [options]      Initialize a new workspace in current directory
-    start [options]     Start JupyterLab server
+    start [options]     Initialize (if needed) and start JupyterLab server
     stop [options]      Stop JupyterLab server
     new <name>          Create a new notebook with boilerplate
     update              Update notellm to latest version
     version             Show version information
     help                Show this help message
 
-${YELLOW}INIT OPTIONS:${NC}
+${YELLOW}START OPTIONS:${NC}
     -t, --token TOKEN   Authentication token (default: auto-generated)
     -p, --port PORT     JupyterLab port (default: 9999)
-
-${YELLOW}START OPTIONS:${NC}
+    --host HOST         Hostname to use (default: $(hostname))
     -f, --foreground    Run server in foreground
 
 ${YELLOW}STOP OPTIONS:${NC}
+    -p, --port PORT     Stop server on specific port
     -f, --force         Force kill if graceful shutdown fails
     -c, --clean         Remove log and pid files
 
@@ -126,21 +126,20 @@ ${YELLOW}NEW OPTIONS:${NC}
     -o, --open          Open in browser after creation
 
 ${YELLOW}EXAMPLES:${NC}
-    notellm init                    # Set up workspace with defaults
-    notellm init -p 8888            # Use custom port
-    notellm start                   # Start Jupyter server
-    notellm new my_analysis         # Create notebooks/my_analysis.ipynb
-    notellm new exploration -d .    # Create in current directory
+    notellm start                   # Start with defaults (auto-init if needed)
+    notellm start -p 8888           # Start on port 8888
+    notellm start --host myserver   # Start with custom hostname
     notellm stop                    # Stop the server
+    notellm stop -p 9999            # Stop server on port 9999
+    notellm new my_analysis         # Create notebooks/my_analysis.ipynb
 
 ${YELLOW}WORKFLOW:${NC}
     1. cd ~/my-project
-    2. notellm init
-    3. notellm start
-    4. notellm new analysis
-    5. Open JupyterLab (URL shown) in one half of screen
-    6. Run 'claude' in terminal on other half
-    7. notellm stop (when done)
+    2. notellm start                # Automatically sets everything up
+    3. notellm new analysis         # Create a notebook
+    4. Open JupyterLab URL (shown above) on one side
+    5. Run 'claude' in terminal on other side
+    6. notellm stop (when done)
 
 EOF
 }
@@ -160,79 +159,48 @@ cmd_version() {
 
 cmd_update() {
     banner "Updating notellm"
-    
-    if [ ! -d "$INSTALL_DIR/.git" ]; then
-        log_error "Install directory is not a git repository"
-        echo "Reinstall with: git clone https://github.com/prairie-guy/notellm.git && cd notellm && ./setup.sh"
-        exit 1
-    fi
-    
-    log_step "Pulling latest changes..."
-    git -C "$INSTALL_DIR" pull
-    
-    log_info "Update complete"
+
+    log_warn "Manual update required"
     echo ""
-    notellm version
+    echo "To update notellm:"
+    echo ""
+    echo "  1. Go to your cloned repository"
+    echo "  2. Pull latest changes: ${CYAN}git pull${NC}"
+    echo "  3. Reinstall: ${CYAN}./setup.sh${NC}"
+    echo ""
+    echo "If you don't have the repository:"
+    echo "  ${CYAN}git clone https://github.com/prairie-guy/notellm.git${NC}"
+    echo "  ${CYAN}cd notellm && ./setup.sh${NC}"
+    echo ""
 }
 
 #######################################
-# Command: init
+# Internal: Initialize workspace
 #######################################
 
-cmd_init() {
-    local token=""
-    local port=""
-    
-    # Parse arguments
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -t|--token)
-                token="$2"
-                shift 2
-                ;;
-            -p|--port)
-                port="$2"
-                shift 2
-                ;;
-            -h|--help)
-                cat << EOF
-${BOLD}notellm init${NC} - Initialize workspace
+do_init() {
+    local token="$1"
+    local port="$2"
+    local host="$3"
 
-${YELLOW}USAGE:${NC}
-    notellm init [options]
-
-${YELLOW}OPTIONS:${NC}
-    -t, --token TOKEN   Authentication token for JupyterLab and MCP
-                        Default: auto-generated secure token
-    -p, --port PORT     Port for JupyterLab server
-                        Default: 9999
-    -h, --help          Show this help
-
-${YELLOW}CREATES:${NC}
-    .env.jupyter        Configuration (port, token)
-    .mcp.json           Claude Code MCP server config
-    pyproject.toml      Python dependencies
-    CLAUDE.md           Instructions for Claude Code
-    notebooks/          Notebook directory
-    data/               Data directory
-    figures/            Saved visualizations
-    src/                Python modules
-
-EOF
-                exit 0
-                ;;
-            *)
-                log_error "Unknown option: $1"
-                exit 1
-                ;;
-        esac
-    done
-    
-    # Set defaults
-    token="${token:-$DEFAULT_TOKEN}"
-    port="${port:-$DEFAULT_PORT}"
-    
     banner "Initializing notellm workspace"
+
+    # Handle hostname binding
+    # When a hostname is provided, bind to 0.0.0.0 (all interfaces) to ensure
+    # accessibility both locally (via /etc/hosts) and remotely (via DNS)
+    local resolved_host="$host"
+    local mcp_host="$host"
+
+    if [ "$host" != "0.0.0.0" ] && [ "$host" != "localhost" ] && ! [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        # It's a hostname - bind to all interfaces for maximum compatibility
+        log_step "Using hostname '$host' - binding to all interfaces (0.0.0.0)"
+        resolved_host="0.0.0.0"
+        mcp_host="$host"
+        log_info "Server will accept connections via hostname and all network interfaces"
+    elif [ "$host" = "0.0.0.0" ]; then
+        # User explicitly requested 0.0.0.0, use system hostname for MCP
+        mcp_host="$(hostname)"
+    fi
     
     # Validate port
     if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1024 ] || [ "$port" -gt 65535 ]; then
@@ -285,13 +253,15 @@ EOF
     cat > "$CONFIG_FILE" << EOF
 # notellm configuration
 # Generated: $(date)
+JUPYTER_HOST=${resolved_host}
+JUPYTER_HOSTNAME=${host}
 JUPYTER_PORT=${port}
 JUPYTER_TOKEN=${token}
 EOF
-    
+
     log_info "Created $CONFIG_FILE"
-    
-    # Generate .mcp.json
+
+    # Generate .mcp.json using the mcp_host determined earlier
     cat > .mcp.json << EOF
 {
   "mcpServers": {
@@ -299,7 +269,7 @@ EOF
       "command": "uvx",
       "args": ["jupyter-mcp-server@latest"],
       "env": {
-        "JUPYTER_URL": "http://localhost:${port}",
+        "JUPYTER_URL": "http://${mcp_host}:${port}",
         "JUPYTER_TOKEN": "${token}",
         "ALLOW_IMG_OUTPUT": "true"
       }
@@ -359,21 +329,8 @@ EOF
     uv sync
     log_info "Dependencies installed"
     
-    # Summary
-    echo ""
-    echo -e "${GREEN}╔════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║            Workspace Ready!                    ║${NC}"
-    echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
-    echo ""
-    echo -e "${YELLOW}Configuration:${NC}"
-    echo "  Port:  $port"
-    echo "  Token: $token"
-    echo ""
-    echo -e "${YELLOW}Next steps:${NC}"
-    echo -e "  ${CYAN}notellm start${NC}           # Start JupyterLab"
-    echo -e "  ${CYAN}notellm new analysis${NC}    # Create a notebook"
-    echo -e "  ${CYAN}claude${NC}                  # Start Claude Code (other terminal)"
-    echo ""
+    # Summary (minimal - full summary shown by start command)
+    log_info "Workspace initialized"
 }
 
 #######################################
@@ -382,12 +339,31 @@ EOF
 
 cmd_start() {
     local foreground=false
-    
+    local token=""
+    local port=""
+    local host=""
+    local has_init_options=false
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             -f|--foreground)
                 foreground=true
                 shift
+                ;;
+            -t|--token)
+                token="$2"
+                has_init_options=true
+                shift 2
+                ;;
+            -p|--port)
+                port="$2"
+                has_init_options=true
+                shift 2
+                ;;
+            --host)
+                host="$2"
+                has_init_options=true
+                shift 2
                 ;;
             -h|--help)
                 cat << EOF
@@ -397,8 +373,20 @@ ${YELLOW}USAGE:${NC}
     notellm start [options]
 
 ${YELLOW}OPTIONS:${NC}
+    -t, --token TOKEN   Authentication token (default: auto-generated)
+    -p, --port PORT     Port for JupyterLab (default: 9999)
+    --host HOST         Hostname to use (default: $(hostname))
     -f, --foreground    Run in foreground (default: background)
     -h, --help          Show this help
+
+${YELLOW}BEHAVIOR:${NC}
+    If options are provided OR no config exists, workspace is initialized first.
+    Otherwise, uses existing configuration.
+
+${YELLOW}EXAMPLES:${NC}
+    notellm start                      # Use existing config or init with defaults
+    notellm start --port 8888          # Reinitialize with port 8888
+    notellm start --host myserver      # Reinitialize with hostname
 
 EOF
                 exit 0
@@ -409,8 +397,34 @@ EOF
                 ;;
         esac
     done
-    
-    require_config
+
+    # Check if we need to initialize
+    if [ "$has_init_options" = true ] || [ ! -f "$CONFIG_FILE" ]; then
+        # Set defaults if not provided
+        token="${token:-$DEFAULT_TOKEN}"
+        port="${port:-$DEFAULT_PORT}"
+        host="${host:-$DEFAULT_HOST}"
+
+        # Stop any running server on the target port before reinitializing
+        if [ -f "$CONFIG_FILE" ]; then
+            source "$CONFIG_FILE"
+            if [ "$JUPYTER_PORT" != "$port" ]; then
+                # Different port requested, stop old server
+                if is_jupyter_running; then
+                    log_step "Stopping server on port $JUPYTER_PORT..."
+                    local old_pid=$(cat "$PID_FILE")
+                    kill -TERM "$old_pid" 2>/dev/null || true
+                    sleep 2
+                    rm -f "$PID_FILE"
+                fi
+            fi
+        fi
+
+        # Initialize workspace
+        do_init "$token" "$port" "$host"
+    fi
+
+    # Load config (now guaranteed to exist)
     source "$CONFIG_FILE"
     
     banner "Starting JupyterLab"
@@ -419,7 +433,13 @@ EOF
     if is_jupyter_running; then
         log_warn "JupyterLab is already running (PID: $(cat $PID_FILE))"
         echo ""
-        echo "  URL: http://localhost:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+            local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+            echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+            echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        else
+            echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        fi
         echo ""
         echo "  To stop:    notellm stop"
         echo "  To restart: notellm stop && notellm start"
@@ -435,21 +455,25 @@ EOF
     fi
     
     log_info "Port $JUPYTER_PORT is available"
-    
+
     if [ "$foreground" = true ]; then
         log_info "Starting in foreground (Ctrl+C to stop)..."
         echo ""
         uv run jupyter lab \
+            --ip "$JUPYTER_HOST" \
             --port "$JUPYTER_PORT" \
             --IdentityProvider.token="$JUPYTER_TOKEN" \
+            --ServerApp.allow_remote_access=true \
             --no-browser \
             --notebook-dir=.
     else
         log_step "Starting in background..."
-        
+
         nohup uv run jupyter lab \
+            --ip "$JUPYTER_HOST" \
             --port "$JUPYTER_PORT" \
             --IdentityProvider.token="$JUPYTER_TOKEN" \
+            --ServerApp.allow_remote_access=true \
             --no-browser \
             --notebook-dir=. \
             > "$LOG_FILE" 2>&1 &
@@ -469,7 +493,17 @@ EOF
         echo -e "${GREEN}║            JupyterLab Running                  ║${NC}"
         echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
         echo ""
-        echo -e "${YELLOW}URL:${NC} http://localhost:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+
+        # Display appropriate URL based on host
+        if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+            local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+            echo -e "${YELLOW}URLs:${NC}"
+            echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+            echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        else
+            echo -e "${YELLOW}URL:${NC} http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
+        fi
+
         echo ""
         echo -e "${YELLOW}Next:${NC}"
         echo -e "  ${CYAN}notellm new my_analysis${NC}   # Create notebook"
@@ -488,7 +522,8 @@ EOF
 cmd_stop() {
     local force=false
     local clean=false
-    
+    local port=""
+
     while [[ $# -gt 0 ]]; do
         case $1 in
             -f|--force)
@@ -499,6 +534,10 @@ cmd_stop() {
                 clean=true
                 shift
                 ;;
+            -p|--port)
+                port="$2"
+                shift 2
+                ;;
             -h|--help)
                 cat << EOF
 ${BOLD}notellm stop${NC} - Stop JupyterLab server
@@ -507,9 +546,15 @@ ${YELLOW}USAGE:${NC}
     notellm stop [options]
 
 ${YELLOW}OPTIONS:${NC}
+    -p, --port PORT Port to stop server on (bypasses PID file)
     -f, --force     Force kill if graceful shutdown fails
     -c, --clean     Remove log and pid files after stopping
     -h, --help      Show this help
+
+${YELLOW}EXAMPLES:${NC}
+    notellm stop              # Stop server using PID file
+    notellm stop -p 9999      # Stop server on port 9999
+    notellm stop --force      # Force kill if needed
 
 EOF
                 exit 0
@@ -520,22 +565,62 @@ EOF
                 ;;
         esac
     done
-    
+
     banner "Stopping JupyterLab"
-    
+
+    # If port specified, stop by port instead of PID file
+    if [ -n "$port" ]; then
+        log_step "Stopping server on port $port..."
+
+        if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
+            log_warn "No server running on port $port"
+            exit 0
+        fi
+
+        local pid=$(lsof -t -i :$port)
+        if [ -n "$pid" ]; then
+            log_info "Found process $pid on port $port"
+            echo -n "  Sending SIGTERM..."
+            kill -TERM "$pid" 2>/dev/null || true
+
+            local count=0
+            while is_process_running "$pid" && [ $count -lt 10 ]; do
+                echo -n "."
+                sleep 1
+                ((count++))
+            done
+            echo ""
+
+            if is_process_running "$pid"; then
+                if [ "$force" = true ]; then
+                    log_warn "Forcing shutdown..."
+                    kill -KILL "$pid" 2>/dev/null || true
+                    sleep 1
+                else
+                    log_error "Graceful shutdown timed out. Use --force to kill."
+                    exit 1
+                fi
+            fi
+
+            log_info "Server on port $port stopped"
+            [ "$clean" = true ] && rm -f "$PID_FILE" "$LOG_FILE" 2>/dev/null
+        fi
+        exit 0
+    fi
+
+    # Otherwise use PID file method (original behavior)
     if [ ! -f "$PID_FILE" ]; then
         log_warn "No PID file found. Server may not be running."
-        
+
         if [ -f "$CONFIG_FILE" ]; then
             source "$CONFIG_FILE"
             if lsof -Pi :${JUPYTER_PORT:-9999} -sTCP:LISTEN -t >/dev/null 2>&1; then
                 log_warn "Something is on port ${JUPYTER_PORT:-9999}"
                 echo ""
-                echo "To stop it manually:"
-                echo "  kill \$(lsof -t -i :${JUPYTER_PORT:-9999})"
+                echo "To stop it: notellm stop -p ${JUPYTER_PORT:-9999}"
             fi
         fi
-        
+
         [ "$clean" = true ] && rm -f "$PID_FILE" "$LOG_FILE" 2>/dev/null
         exit 0
     fi
@@ -822,7 +907,7 @@ EOF
         if [ -f "$CONFIG_FILE" ] && is_jupyter_running; then
             source "$CONFIG_FILE"
             echo -e "${YELLOW}Open in JupyterLab:${NC}"
-            echo "  http://localhost:${JUPYTER_PORT}/lab/tree/${path}"
+            echo "  http://localhost:${JUPYTER_PORT}/lab/tree/${path}?token=${JUPYTER_TOKEN}"
         else
             echo -e "${YELLOW}Start server:${NC} notellm start"
         fi
@@ -847,9 +932,6 @@ command="$1"
 shift
 
 case "$command" in
-    init)
-        cmd_init "$@"
-        ;;
     start)
         cmd_start "$@"
         ;;

@@ -31,19 +31,16 @@ This installs:
 # 1. Create a new project
 mkdir ~/my-analysis && cd ~/my-analysis
 
-# 2. Initialize workspace
-notellm init
-
-# 3. Start JupyterLab
+# 2. Start JupyterLab (auto-initializes workspace)
 notellm start
 
-# 4. Create a notebook
+# 3. Create a notebook
 notellm new exploration
 
-# 5. Start Claude Code (in another terminal)
+# 4. Start Claude Code (in another terminal)
 claude
 
-# 6. When done
+# 5. When done
 notellm stop
 ```
 
@@ -83,40 +80,39 @@ Create a comparison bar chart
 
 ## Commands
 
-### `notellm init`
+### `notellm start`
 
-Initialize a new workspace in the current directory.
+Initialize workspace (if needed) and start JupyterLab server.
 
 ```bash
-notellm init                    # Use defaults (port 9999, auto token)
-notellm init --port 8888        # Custom port
-notellm init --token mysecret   # Custom token
+notellm start                      # Use defaults or existing config
+notellm start --port 8888          # Reinitialize with custom port
+notellm start --host myserver      # Reinitialize with hostname
+notellm start --token mysecret     # Reinitialize with custom token
+notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 ```
 
-Creates:
+**Behavior:**
+- If no config exists OR options provided: initializes workspace first
+- Otherwise: uses existing configuration
+- Always keeps `.mcp.json` in sync with running server
+
+**Creates (on first run):**
 - `pyproject.toml` — Python dependencies
 - `CLAUDE.md` — Instructions for Claude Code
 - `.mcp.json` — MCP server configuration
 - `.env.jupyter` — Port and token config
 - `notebooks/`, `data/`, `src/`, `figures/` directories
 
-### `notellm start`
-
-Start the JupyterLab server.
-
-```bash
-notellm start              # Run in background
-notellm start --foreground # Run in foreground (Ctrl+C to stop)
-```
-
 ### `notellm stop`
 
 Stop the JupyterLab server.
 
 ```bash
-notellm stop           # Graceful shutdown
-notellm stop --force   # Force kill if needed
-notellm stop --clean   # Also remove log files
+notellm stop              # Graceful shutdown (uses PID file)
+notellm stop --port 9999  # Stop server on specific port
+notellm stop --force      # Force kill if needed
+notellm stop --clean      # Also remove log files
 ```
 
 ### `notellm new`
@@ -149,7 +145,8 @@ Show help for any command.
 
 ```bash
 notellm help
-notellm init --help
+notellm start --help
+notellm stop --help
 notellm new --help
 ```
 
