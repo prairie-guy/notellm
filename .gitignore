@@ -18,4 +18,8 @@ __pycache__/
 # Claude Code
 .claude
 
-# emacs
+# Emacs
+*~
+\#*\#
+.#*
+*.~undo-tree~
