@@ -4,7 +4,7 @@ A command-line tool for creating Jupyter + Claude Code workspaces optimized for 
 
 **notellm** sets up everything you need to work with JupyterLab and Claude Code side-by-side:
 - JupyterLab with MCP server integration (Claude can read/write notebooks)
-- Claude magic commands (`%🎷`) for in-notebook prompts
+- Claude magic commands (`%cc`) for in-notebook prompts
 - Notebook templates with sensible defaults (polars, altair, etc.)
 - Simple commands to start, stop, and manage your workspace
 
@@ -72,14 +72,61 @@ Use the Claude magic for quick prompts:
 %load_ext cc_jupyter
 
 # Single line
-%🎷 Create a histogram of the 'price' column
+%cc Create a histogram of the 'price' column
 
 # Multi-line
-%%🎷
+%%cc
 Group by category
 Calculate mean and median
 Create a comparison bar chart
 ```
+
+## Claude Magic Commands
+
+The `cc_jupyter` extension provides full Claude Code integration within Jupyter notebooks:
+
+**Features:**
+- Full agentic Claude Code execution
+- Cell-based code approval workflow
+- Real-time message streaming
+- Session state preservation
+- Conversation continuity across cells
+
+**Basic Usage:**
+```python
+%cc <instructions>       # Continue with additional instructions (one-line)
+%%cc <instructions>      # Continue with additional instructions (multi-line)
+%cc_new (or %ccn)        # Start fresh conversation
+%cc --help               # Show available options and usage information
+```
+
+**Context Management:**
+```python
+%cc --import <file>       # Add a file to be included in initial conversation messages
+%cc --add-dir <dir>       # Add a directory to Claude's accessible directories
+%cc --mcp-config <file>   # Set path to a .mcp.json file containing MCP server configurations
+%cc --cells-to-load <num> # The number of cells to load into a new conversation (default: all for first %cc, none for %cc_new)
+```
+
+**Output:**
+```python
+%cc --model <name>       # Model to use for Claude Code (default: sonnet)
+%cc --max-cells <num>    # Set the maximum number of cells CC can create per turn (default: 3)
+```
+
+**Display:**
+```python
+%cc --clean              # Replace prompt cells with Claude's code cells (tell us if you like this feature, maybe it should be the default)
+%cc --no-clean           # Turn off the above setting (default)
+```
+
+**When to use each form:**
+- Use `%cc` (single %) for short, one-line instructions
+- Use `%%cc` (double %) for multi-line instructions or detailed prompts
+
+**Notes:**
+- Restart the kernel to stop the Claude session
+- Documentation: go/claude-code-jupyter
 
 ## Commands
 
