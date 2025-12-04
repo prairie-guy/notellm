@@ -34,13 +34,16 @@ mkdir ~/my-analysis && cd ~/my-analysis
 # 2. Start JupyterLab (auto-initializes workspace)
 notellm start
 
-# 3. Create a notebook
+# 3. Patch cc_jupyter (fixes permission errors and removes decorative headers)
+./patch_jupyter_magic.sh
+
+# 4. Create a notebook
 notellm new exploration
 
-# 4. Start Claude Code (in another terminal)
+# 5. Start Claude Code (in another terminal)
 claude
 
-# 5. When done
+# 6. When done
 notellm stop
 ```
 
@@ -102,6 +105,7 @@ notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 - `CLAUDE.md` — Instructions for Claude Code
 - `.mcp.json` — MCP server configuration
 - `.env.jupyter` — Port and token config
+- `patch_jupyter_magic.sh` — Patch script for cc_jupyter fixes (run after first install)
 - `notebooks/`, `data/`, `src/`, `figures/` directories
 
 ### `notellm stop`
@@ -191,6 +195,29 @@ notellm start --help
 notellm stop --help
 notellm new --help
 ```
+
+## Patching cc_jupyter
+
+After running `notellm start` for the first time, run the patch script to fix known issues:
+
+```bash
+./patch_jupyter_magic.sh
+```
+
+**What it fixes:**
+- **Permission errors**: Prevents `PermissionError` when checking `/root/code` on some systems
+- **Clean output**: Removes decorative box headers from `%cc` magic-generated cells
+
+**When to run:**
+- After first `notellm start` in a new project
+- After updating Python dependencies (`uv sync`)
+- If you encounter permission errors or unwanted cell decorations
+
+The script automatically:
+- Locates your `.venv` installation
+- Creates backups before patching (`.backup` files)
+- Checks if patches are already applied (won't re-apply)
+- Can be extended with additional patches in the future
 
 ## Dependencies
 

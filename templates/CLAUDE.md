@@ -1,78 +1,113 @@
-# Project Configuration
+# Coding Style Guide
 
-## Environment
+## General Principles
 
-- Python 3.12 managed via `uv`
-- JupyterLab running on port {{PORT}}
-- Jupyter MCP server enabled for real-time notebook access
+### Layout
 
-## Jupyter Notebook Workflow
+- Maximum line width: 160 characters
+- One line of code should implement one complete idea
+- If a 1-line function body fits comfortably on the same line as `def`/`function`, put them together
+- No blank line between signature and first line of code
+- No blank line between docstring and code
+- Minimal blank lines within function bodies—use sparingly to indicate logical sections
 
-### CRITICAL: Always Read Context First
+Example:
 
-Before generating any new cell content:
-
-1. Use `read_cells` or `read_notebook` to understand existing notebook state
-2. Use `read_cell` with `include_outputs=true` to see execution results including images/plots
-3. Reference prior cells explicitly when generating dependent code
-
-### Available Tools
-
-**Jupyter MCP Server Tools:**
-- `use_notebook` - Connect to a notebook
-- `read_cells` - Read all cells with full content
-- `read_cell` - Read single cell with outputs (including images)
-- `insert_cell` - Add new cell at position
-- `execute_cell` - Run a cell and get outputs
-- `insert_execute_code_cell` - Insert and run in one step
-
-**In-Notebook Magic:**
-- User may use `%🎷` or `%%🎷` magic commands in cells
-- These share state bidirectionally with the notebook kernel
-- Load with: `%load_ext cc_jupyter`
-
-### Workflow Pattern
-
-When user asks for notebook help:
-
-1. First: `use_notebook` to connect to the active notebook
-2. Then: `read_cells` with `response_format="detailed"` to see full context
-3. For specific cells with outputs: `read_cell` with `include_outputs=true`
-4. Generate code that builds on existing variables and imports
-5. Prefer `insert_cell` over `insert_execute_code_cell` to let user review first
-
-### Code Style
-
-- Use polars for dataframes (prefer over pandas unless user specifies)
-- Use altair for visualizations (prefer over matplotlib unless user specifies)
-- Include type hints
-- Keep cells focused—one logical step per cell
-- Add markdown cells to explain analysis steps
-
-## Commands
-
-```bash
-# Start JupyterLab
-notellm start
-
-# Create new notebook
-notellm new <name>
-
-# Stop server
-notellm stop
+```python
+def double(x: int) -> int: return x * 2
 ```
 
-## Directory Structure
+### Alignment
 
+Align conceptually similar statement parts so differences are immediately visible:
+
+```python
+if self.store.stretch_dir==0: x = stretch_cv(x, self.store.stretch, 0)
+else:                         x = stretch_cv(x, 0, self.store.stretch)
 ```
-├── notebooks/          # Jupyter notebooks
-├── data/              # Data files
-├── src/               # Python modules
-└── figures/           # Saved visualizations
+
+### Naming
+
+Follow the Huffman Coding principle: commonly used and generic concepts get shorter names.
+
+Follow the life-cycle principle: shorter-lived symbols get shorter names.
+
+- **Aggressive abbreviations**: list comprehensions, lambdas, temporary variables
+- **Common abbreviations**: function arguments, function names, variables
+- **Light/no abbreviations**: module names, class names, constructors
+
+Common short names: `i` (index), `k`/`v` (key/value), `o` (object in comprehension), `x` (input), `n` (count), `fn` (function), `df` (dataframe), `sz` (size)
+
+Use domain-appropriate abbreviations consistently.
+
+### Comments
+
+Avoid comments unless necessary to explain *why*. Use clear symbol names and expository code to show *how*.
+
+### Code Generation Scope
+
+Generate only what was requested. **Do not include test code, example usage, or demonstration calls unless explicitly asked.**
+
+Let the user decide when and how to test or use the code.
+
+### Formatting
+
+- Do not use automatic linters or formatters
+- Align conceptually similar statement parts so differences are immediately visible
+
+-----
+
+## Python
+
+### Signatures
+
+- Keep signatures on one line when under 160 characters
+- Use type hints—they serve as documentation (not enforcement)
+
+### Docstrings
+
+- One-line docstrings for simple functions: `"""Return the sum of x and y."""`
+- Parameters should be evident from type hints; don’t repeat them in docstrings
+
+### Casing
+
+- `CamelCase` for classes
+- `snake_case` for functions, variables, modules
+
+-----
+
+## Julia
+
+### Type Annotations
+
+Omit type annotations unless needed for multiple dispatch. When annotations are required, prefer abstract types (`AbstractArray`, `Real`, `Number`) to preserve flexibility.
+
+### Docstrings
+
+Standard Julia docstrings (Markdown above the function with triple quotes). Use short one-line docstrings for simple functions.
+
+-----
+
+## Library Preferences
+
+### Polars
+
+Use method chaining. Surround with parentheses, one method per line, each line starting with `.`:
+
+```python
+(df.filter(pl.col("a") > 1)
+    .select("a", "b")
+    .sort("a"))
 ```
 
-## MCP Connection
+### Altair
 
-- URL: http://localhost:{{PORT}}
-- Token: {{TOKEN}}
-- Image output: enabled
+Use method chaining, same pattern as Polars:
+
+```python
+(alt.Chart(df)
+    .mark_bar()
+    .encode(
+        x="category",
+        y="value"))
+```

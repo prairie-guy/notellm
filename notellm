@@ -256,6 +256,8 @@ do_init() {
     
     cp "$INSTALL_DIR/templates/pyproject.toml" .
     cp "$INSTALL_DIR/templates/CLAUDE.md" .
+    cp "$INSTALL_DIR/templates/patch_jupyter_magic.sh" .
+    chmod +x patch_jupyter_magic.sh
 
     log_info "Templates copied"
     
@@ -301,7 +303,14 @@ EOF
     fi
     
     log_info "Updated CLAUDE.md"
-    
+
+    # Create Claude Code settings
+    log_step "Creating Claude Code settings..."
+    mkdir -p .claude
+    cp "$INSTALL_DIR/templates/settings.json" .claude/settings.json
+    cp "$INSTALL_DIR/templates/settings.json" .claude/settings.local.json
+    log_info "Created .claude/settings.json and .claude/settings.local.json"
+
     # Create directory structure
     log_step "Creating directories..."
     mkdir -p notebooks data src figures
@@ -323,6 +332,12 @@ __pycache__/
 *.ipynb_checkpoints/
 .jupyter.pid
 .jupyter.log
+
+# Patch backups
+*.backup
+
+# Claude Code
+.claude/settings.local.json
 
 # IDE
 .vscode/
@@ -750,12 +765,13 @@ ${YELLOW}USAGE:${NC}
     notellm clean [options]
 
 ${YELLOW}OPTIONS:${NC}
-    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md, .jupyter*
+    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md, .claude/, .jupyter*, and uv cache
     -h, --help  Show this help
 
 ${YELLOW}BEHAVIOR:${NC}
     Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log
-    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md, .jupyter_ystore.db
+    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md, .claude/, .jupyter_ystore.db,
+             and cleans uv cache for patched packages (claude-code-jupyter-staging)
 
     User files are preserved: notebooks/, data/, src/, figures/, *.ipynb
 
@@ -796,6 +812,7 @@ EOF
         [ -f "uv.lock" ] && files_to_remove+=("uv.lock")
         [ -f "pyproject.toml" ] && files_to_remove+=("pyproject.toml")
         [ -f "CLAUDE.md" ] && files_to_remove+=("CLAUDE.md")
+        [ -d ".claude" ] && files_to_remove+=(".claude/")
 
         # Add all .jupyter* files and directories (except .jupyter.pid and .jupyter.log which are already included)
         for item in .jupyter*; do
@@ -845,6 +862,14 @@ EOF
             log_info "Removed $file"
         fi
     done
+
+    # Clean uv cache for patched packages
+    if [ "$purge" = true ]; then
+        echo ""
+        log_step "Cleaning uv cache for patched packages..."
+        uv cache clean claude-code-jupyter-staging --force 2>/dev/null || true
+        log_info "Cleaned cache for claude-code-jupyter-staging"
+    fi
 
     echo ""
     log_info "Workspace cleaned"
@@ -979,11 +1004,24 @@ EOF
    ]
   },
   {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Configuration"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Display Settings"
+   ]
+  },
+  {
    "cell_type": "code",
    "execution_count": null,
    "metadata": {},
    "source": [
-    "# Configuration\\n",
     "warnings.filterwarnings('ignore')\\n",
     "\\n",
     "# Pandas display\\n",
@@ -995,22 +1033,14 @@ EOF
     "pl.Config.set_tbl_rows(20)\\n",
     "pl.Config.set_fmt_str_lengths(50)\\n",
     "\\n",
-    "# Matplotlib\\n",
-    "plt.style.use('seaborn-v0_8-whitegrid')\\n",
-    "%matplotlib inline\\n",
-    "\\n",
-    "# Paths\\n",
-    "DATA_DIR = Path('../data')\\n",
-    "FIGURES_DIR = Path('../figures')\\n",
-    "\\n",
-    "print('✓ Setup complete')"
+    "print('✓ Display settings configured')"
    ]
   },
   {
    "cell_type": "markdown",
    "metadata": {},
    "source": [
-    "## Data Loading"
+    "#### Visualization"
    ]
   },
   {
@@ -1018,9 +1048,17 @@ EOF
    "execution_count": null,
    "metadata": {},
    "source": [
-    "# Load your data here\\n",
-    "# df = pl.read_csv(DATA_DIR / 'your_data.csv')\\n",
-    "# df.head()"
+    "plt.style.use('seaborn-v0_8-whitegrid')\\n",
+    "%matplotlib inline\\n",
+    "\\n",
+    "print('✓ Visualization configured')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Paths"
    ]
   },
   {
@@ -1028,9 +1066,27 @@ EOF
    "execution_count": null,
    "metadata": {},
    "source": [
-    "# Claude magic (optional)\\n",
-    "# %load_ext cc_jupyter\\n",
-    "# %🎷 Your prompt here"
+    "DATA_DIR = Path('../data')\\n",
+    "FIGURES_DIR = Path('../figures')\\n",
+    "\\n",
+    "print('✓ Paths configured')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Jupyter Magic"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "source": [
+    "%load_ext cc_jupyter\\n",
+    "\\n",
+    "print('✓ Claude magic loaded')"
    ]
   }
  ],
@@ -1056,8 +1112,11 @@ EOF
     echo -e "${YELLOW}Contents:${NC}"
     echo "  • Title: $title"
     echo "  • Imports: polars, pandas, numpy, altair, matplotlib, seaborn"
-    echo "  • Config: display options, paths"
-    echo "  • Claude magic placeholder"
+    echo "  • Configuration:"
+    echo "    - Display settings"
+    echo "    - Visualization"
+    echo "    - Paths"
+    echo "    - Jupyter magic (Claude)"
     echo ""
     
     # Open in browser
