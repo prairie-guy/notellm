@@ -1,12 +1,12 @@
 # notellm
- 
+
 A command-line tool for creating Jupyter + Claude Code workspaces optimized for AI-assisted data science.
 
-**notellm** sets up everything you need to work with JupyterLab and Claude Code side-by-side:
-- JupyterLab with MCP server integration (Claude can read/write notebooks)
-- Claude magic commands (`%cc`) for in-notebook prompts
-- Notebook templates with sensible defaults (polars, altair, etc.)
-- Simple commands to start, stop, and manage your workspace
+**notellm** gives you two powerful ways to work with Claude and Jupyter:
+1. **From the outside** — Use Claude Code in your terminal to read, write, and execute notebook cells via the Jupyter MCP Server
+2. **From the inside** — Use Claude magic commands (`%cc`) directly in notebook cells for quick, focused tasks
+
+Both approaches work seamlessly together in a single workspace with everything pre-configured.
 
 ## Installation
 
@@ -43,30 +43,89 @@ notellm new exploration
 # 5. Start Claude Code (in another terminal)
 claude
 
-# 6. When done
+# 6. Work with Claude from OUTSIDE the notebook:
+> list available notebooks
+> connect to notebooks/exploration.ipynb
+> read all cells with outputs
+> add a code cell that creates a scatter plot of price vs quantity
+
+# OR work from INSIDE the notebook:
+# In a cell:
+%load_ext cc_jupyter
+%cc Create a histogram of the 'price' column
+
+# 7. When done
 notellm stop
 ```
 
-## Workflow
+## Two Ways to Work with Claude
 
-Split your screen:
-- **Left half:** JupyterLab in browser
-- **Right half:** Claude Code in terminal
+Split your screen with JupyterLab on the left and Claude Code on the right. You can interact with your notebooks using either approach—or both!
 
-### From Claude Code
+### Working from Outside: Jupyter MCP Server
 
-Claude can read and manipulate your notebooks via MCP:
+Use Claude Code in your terminal to manipulate notebooks programmatically. The Jupyter MCP Server gives Claude full access to read, write, execute, and analyze cells.
+
+**When to use:**
+- Complex multi-step workflows across multiple cells
+- Architecture and structural changes to notebooks
+- Analyzing outputs and iterating on results
+- Working with multiple notebooks
+- When you want Claude to see the full notebook context
+
+**Key capabilities:**
+- List and connect to notebooks
+- Read cells with their outputs (including plots and visualizations)
+- Insert, modify, and delete cells at specific positions
+- Execute code and capture multimodal results
+- Restart kernels and manage notebook state
+
+**Example workflow:**
 
 ```
-> use the notebook notebooks/exploration.ipynb
+> list available notebooks in the notebooks directory
+
+> connect to notebooks/exploration.ipynb
+
 > read all cells with outputs
-> add a code cell that creates a scatter plot of price vs quantity
-> read cell 5 with outputs and suggest improvements
+
+> add a code cell after cell 3 that loads data from data/sales.csv using polars
+
+> execute the new cell and show me the output
+
+> the data looks good, now add another cell that creates a scatter plot
+  of price vs quantity with altair
+
+> read cell 5 with outputs
+
+> the plot needs a title and better colors, modify cell 5 to improve it
+
+> execute cell 5 and show the updated visualization
 ```
 
-### From Notebook Cells
+**MCP Configuration:**
 
-Use the Claude magic for quick prompts:
+The Jupyter MCP Server is automatically configured in `.mcp.json` when you run `notellm start`. Claude Code will connect to your JupyterLab instance using the port and token from `.env.jupyter`.
+
+### Working from Inside: Claude Magic Commands
+
+Use `%cc` magic commands directly in notebook cells for quick, focused prompts. Perfect for iterative development and exploratory analysis.
+
+**When to use:**
+- Quick iterations on a single task
+- Focused code generation in one cell
+- Exploratory data analysis
+- When you're already working in the notebook
+- Rapid prototyping and experimentation
+
+**Features:**
+- Full agentic Claude Code execution
+- Cell-based code approval workflow
+- Real-time message streaming
+- Session state preservation
+- Conversation continuity across cells
+
+**Basic Usage:**
 
 ```python
 %load_ext cc_jupyter
@@ -81,18 +140,8 @@ Calculate mean and median
 Create a comparison bar chart
 ```
 
-## Claude Magic Commands
+**Starting fresh vs continuing:**
 
-The `cc_jupyter` extension provides full Claude Code integration within Jupyter notebooks:
-
-**Features:**
-- Full agentic Claude Code execution
-- Cell-based code approval workflow
-- Real-time message streaming
-- Session state preservation
-- Conversation continuity across cells
-
-**Basic Usage:**
 ```python
 %cc <instructions>       # Continue with additional instructions (one-line)
 %%cc <instructions>      # Continue with additional instructions (multi-line)
@@ -101,6 +150,7 @@ The `cc_jupyter` extension provides full Claude Code integration within Jupyter 
 ```
 
 **Context Management:**
+
 ```python
 %cc --import <file>       # Add a file to be included in initial conversation messages
 %cc --add-dir <dir>       # Add a directory to Claude's accessible directories
@@ -108,25 +158,45 @@ The `cc_jupyter` extension provides full Claude Code integration within Jupyter 
 %cc --cells-to-load <num> # The number of cells to load into a new conversation (default: all for first %cc, none for %cc_new)
 ```
 
-**Output:**
+**Output Control:**
+
 ```python
 %cc --model <name>       # Model to use for Claude Code (default: sonnet)
 %cc --max-cells <num>    # Set the maximum number of cells CC can create per turn (default: 3)
 ```
 
-**Display:**
+**Display Options:**
+
 ```python
 %cc --clean              # Replace prompt cells with Claude's code cells (tell us if you like this feature, maybe it should be the default)
 %cc --no-clean           # Turn off the above setting (default)
 ```
 
-**When to use each form:**
-- Use `%cc` (single %) for short, one-line instructions
-- Use `%%cc` (double %) for multi-line instructions or detailed prompts
-
 **Notes:**
 - Restart the kernel to stop the Claude session
 - Documentation: go/claude-code-jupyter
+
+## Choosing Your Workflow
+
+**Use Jupyter MCP Server (terminal) when:**
+- You need to work across multiple cells systematically
+- You're making structural changes to the notebook
+- You want to analyze outputs and iterate based on results
+- You need the full notebook context
+- You're debugging or refactoring existing code
+
+**Use Claude Magic Commands (in cells) when:**
+- You want quick code generation for a specific task
+- You're doing exploratory analysis and iterating rapidly
+- You're already working in the notebook and want inline help
+- You need a single focused operation
+- You want minimal context switching
+
+**Use both together:**
+- Start with MCP Server to set up notebook structure and load data
+- Switch to magic commands for rapid iteration on visualizations
+- Use MCP Server to review outputs and make coordinated changes
+- Use magic commands for quick fixes and experiments
 
 ## Commands
 
