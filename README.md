@@ -4,7 +4,7 @@ A command-line tool for creating Jupyter + Claude Code workspaces optimized for 
 
 **notellm** gives you two powerful ways to work with Claude and Jupyter:
 1. **From the outside** — Use Claude Code in your terminal to read, write, and execute notebook cells via the Jupyter MCP Server
-2. **From the inside** — Use Claude magic commands (`%cc`) directly in notebook cells for quick, focused tasks
+2. **From the inside** — Use Claude Magic Commands (`%cc`) directly in notebook cells for quick, focused tasks
 
 Both approaches work seamlessly together in a single workspace with everything pre-configured.
 
@@ -73,43 +73,40 @@ Use Claude Code in your terminal to manipulate notebooks programmatically. The J
 - Working with multiple notebooks
 - When you want Claude to see the full notebook context
 
-**Key capabilities:**
-- List and connect to notebooks
-- Read cells with their outputs (including plots and visualizations)
-- Insert, modify, and delete cells at specific positions
-- Execute code and capture multimodal results
-- Restart kernels and manage notebook state
+**Available Tools:**
 
-**Example workflow:**
+**Server Management:**
+- `list_files` — List files and directories in the Jupyter server's file system
+- `list_kernels` — List all available and running kernel sessions on the Jupyter server
 
-```
-> list available notebooks in the notebooks directory
+**Notebook Management:**
+- `use_notebook` — Connect to a notebook file, create a new one, or switch between notebooks
+- `list_notebooks` — List all notebooks available on the Jupyter server and their status
+- `restart_notebook` — Restart the kernel for a specific managed notebook
+- `unuse_notebook` — Disconnect from a specific notebook and release its resources
+- `read_notebook` — Read notebook cells source content with brief or detailed format options
 
-> connect to notebooks/exploration.ipynb
+**Cell Operations:**
+- `read_cell` — Read the full content (Metadata, Source and Outputs) of a single cell
+- `insert_cell` — Insert a new code or markdown cell at a specified position
+- `delete_cell` — Delete a cell at a specified index
+- `overwrite_cell_source` — Overwrite the source code of an existing cell
 
-> read all cells with outputs
+**Code Execution:**
+- `execute_cell` — Execute a cell with timeout, supports multimodal output including images
+- `insert_execute_code_cell` — Insert a new code cell and execute it in one step
+- `execute_code` — Execute code directly in the kernel, supports magic commands and shell commands
 
-> add a code cell after cell 3 that loads data from data/sales.csv using polars
+**JupyterLab Integration:**
+- `notebook_run-all-cells` — Execute all cells in the current notebook sequentially (JupyterLab mode only)
 
-> execute the new cell and show me the output
-
-> the data looks good, now add another cell that creates a scatter plot
-  of price vs quantity with altair
-
-> read cell 5 with outputs
-
-> the plot needs a title and better colors, modify cell 5 to improve it
-
-> execute cell 5 and show the updated visualization
-```
-
-**MCP Configuration:**
+**Configuration:**
 
 The Jupyter MCP Server is automatically configured in `.mcp.json` when you run `notellm start`. Claude Code will connect to your JupyterLab instance using the port and token from `.env.jupyter`.
 
 ### Working from Inside: Claude Magic Commands
 
-Use `%cc` magic commands directly in notebook cells for quick, focused prompts. Perfect for iterative development and exploratory analysis.
+Use `%cc` Claude Magic Commands directly in notebook cells for quick, focused prompts. Perfect for iterative development and exploratory analysis.
 
 **When to use:**
 - Quick iterations on a single task
@@ -194,9 +191,9 @@ Create a comparison bar chart
 
 **Use both together:**
 - Start with MCP Server to set up notebook structure and load data
-- Switch to magic commands for rapid iteration on visualizations
+- Switch to Claude Magic Commands for rapid iteration on visualizations
 - Use MCP Server to review outputs and make coordinated changes
-- Use magic commands for quick fixes and experiments
+- Use Claude Magic Commands for quick fixes and experiments
 
 ## Commands
 
@@ -236,7 +233,7 @@ notellm stop --port 8888  # Stop all processes on port 8888
 
 **Behavior:**
 - Finds all processes using the specified port (or configured port from `.env.jupyter`)
-- Sends SIGTERM for graceful shutdown (waits up to 30 seconds)
+- Sends SIGTERM for graceful shutdown (waits up to 8 seconds)
 - Automatically sends SIGKILL if process doesn't exit
 - Cleans up `.jupyter.pid` file
 - Default port: Uses `.env.jupyter` if exists, otherwise 9999
@@ -292,7 +289,7 @@ Each notebook includes:
 - Title (derived from filename)
 - Imports: polars, pandas, numpy, altair, matplotlib, seaborn
 - Configuration: display options, paths
-- Claude magic placeholder
+- Claude Magic Commands placeholder
 
 ### `notellm update`
 
@@ -350,7 +347,7 @@ Workspaces include these Python packages:
 | seaborn | Statistical visualization |
 | jupyterlab | Notebook interface |
 | jupyter-collaboration | Real-time collaboration (MCP) |
-| claude-code-jupyter-staging | Claude magic commands |
+| claude-code-jupyter-staging | Claude Magic Commands |
 
 ## Requirements
 

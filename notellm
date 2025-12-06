@@ -273,25 +273,6 @@ JUPYTER_TOKEN=${token}
 EOF
 
     log_info "Created $CONFIG_FILE"
-
-    # Generate .mcp.json using the mcp_host determined earlier
-    cat > .mcp.json << EOF
-{
-  "mcpServers": {
-    "jupyter": {
-      "command": "uvx",
-      "args": ["jupyter-mcp-server@latest"],
-      "env": {
-        "JUPYTER_URL": "http://${mcp_host}:${port}",
-        "JUPYTER_TOKEN": "${token}",
-        "ALLOW_IMG_OUTPUT": "true"
-      }
-    }
-  }
-}
-EOF
-    
-    log_info "Created .mcp.json"
     
     # Update CLAUDE.md with actual values
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -313,8 +294,19 @@ EOF
 
     # Create directory structure
     log_step "Creating directories..."
-    mkdir -p notebooks data src figures
-    log_info "Created notebooks/, data/, src/, figures/"
+    mkdir -p notebooks data figures
+    log_info "Created notebooks/, data/, figures/"
+
+    # Copy src/ directory with notebook helpers
+    log_step "Copying notebook helpers..."
+    if [ -d "$INSTALL_DIR/templates/src" ]; then
+        cp -r "$INSTALL_DIR/templates/src" .
+        log_info "Copied src/ with notebook helper utilities"
+    else
+        # Fallback to creating empty src/ if templates don't have it
+        mkdir -p src
+        log_info "Created empty src/"
+    fi
     
     # Create .gitignore
     if [ ! -f .gitignore ]; then
@@ -625,9 +617,9 @@ EOF
         kill -TERM "$pid" 2>/dev/null && log_info "Sent SIGTERM to PID $pid" || true
     done
 
-    # Wait up to 10 seconds for graceful shutdown
+    # Wait up to 8 seconds for graceful shutdown
     log_info "Waiting for graceful shutdown..."
-    sleep 10
+    sleep 8
 
     # Force kill any survivors
     for pid in $pids; do

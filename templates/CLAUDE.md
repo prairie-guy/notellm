@@ -1,3 +1,158 @@
+# Project Configuration
+
+## Environment
+
+- Python 3.12 managed via `uv`
+- JupyterLab running on port {{PORT}}
+- Token: {{TOKEN}}
+
+## Directory Structure
+
+```
+├── notebooks/          # Jupyter notebooks
+├── data/              # Data files
+├── src/               # Python modules (including notebook helpers)
+├── figures/           # Saved visualizations
+└── .claude/           # Claude Code settings
+```
+
+## Jupyter Notebook Workflow
+
+### In-Notebook Magic Commands
+
+**cc_jupyter** - `%cc` and `%%cc` magic commands for Claude interactions
+
+Load in notebook:
+```python
+%load_ext cc_jupyter
+```
+
+Usage:
+- `%cc <prompt>` - Single-line prompt, creates new code cell with result
+- `%%cc <prompt>` - Multi-line prompt with code context in cell body
+
+Example:
+```python
+%%cc Create a function to calculate fibonacci numbers
+Use recursion with memoization
+```
+
+### Available Tools
+
+When using `%cc` commands, Claude Code has access to:
+
+**Built-in Tools:**
+- `Bash` - Run shell commands
+- `Read` - Read files
+- `Write` - Create new files
+- `Edit` - Modify existing files
+- `Grep` - Search file contents
+- `WebSearch` - Search the web
+- `WebFetch` - Fetch web content
+
+**Cell Creation:**
+- `mcp__jupyter_executor__create_python_cell` - Create and insert Python code cells
+
+**Note:** This setup does NOT use the external Jupyter MCP server. All operations are streamlined through cc_jupyter and built-in tools.
+
+## Notebook Helper Tools
+
+### Loading Helpers
+
+Add to notebook (usually in first cell):
+```python
+import sys
+sys.path.insert(0, "..")  # or adjust path to reach src/
+%load_ext src.cc_notebook_helpers
+```
+
+### Cell Identification Commands
+
+These commands help organize and reference cells by name instead of fragile numeric indices:
+
+- `%nb_list` - List all cells with names and context
+- `%nb_list --show-empty` - Include empty cells
+- `%nb_find <query>` - Search cells by name/content/tags
+- `%nb_find --name <query>` - Search only names
+- `%nb_find --content <query>` - Search only content
+- `%nb_find --tags <query>` - Search only tags
+- `%nb_name <index> <name>` - Name a cell for stable reference
+- `%nb_tag <index> <tag1> <tag2>` - Tag cells for organization
+- `%nb_section <header>` - Find cells under markdown header
+
+Example workflow:
+```python
+# Name important cells
+%nb_name 15 penguin_viz
+%nb_name 20 data_processing
+
+# List all cells with names
+%nb_list
+
+# Find specific cells
+%nb_find penguin_viz
+```
+
+### Iterative Code Editing
+
+**`%%nb_modify <instruction>`** - Modify code in current cell using Claude
+
+This is the primary tool for incremental code development within Jupyter.
+
+Usage:
+```python
+%%nb_modify sort penguins by name length
+df = sns.load_dataset('penguins')
+species_order = sorted(df['species'].dropna().unique())
+```
+
+How it works:
+1. Put `%%nb_modify` with instruction at top of cell
+2. Include current code below the magic command
+3. Run cell → Claude modifies the code
+4. New cell appears below with modified code only (no magic command)
+5. Iterate: copy magic command to new cell, run again to further refine
+
+Benefits:
+- Fast iterative development
+- Stays within notebook context
+- No separate terminal sessions needed
+- Uses same authentication as cc_jupyter
+
+### Cell Naming for Better Communication
+
+Cell names persist in notebook metadata and survive:
+- Cell insertions/deletions
+- Kernel restarts
+- Git operations
+
+Use names to communicate precisely:
+```python
+# Name the cell first
+%nb_name 23 old_matplotlib_viz
+
+# Then reference by index with confidence
+%cc delete cell 23
+```
+
+## Commands
+
+```bash
+# Start JupyterLab
+notellm start
+
+# Create new notebook
+notellm new <name>
+
+# Stop server
+notellm stop
+
+# Clean and reinstall
+notellm clean --purge
+```
+
+-----
+
 # Coding Style Guide
 
 ## General Principles

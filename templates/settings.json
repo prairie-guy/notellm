@@ -10,25 +10,7 @@
       "Write",
       "WebSearch",
       "WebFetch",
-      "mcp__jupyter_executor__create_python_cell",
-      "mcp__jupyter__*",
-      "mcp__jupyter__list_kernels",
-      "mcp__jupyter__list_notebooks",
-      "mcp__jupyter__use_notebook",
-      "mcp__jupyter__read_notebook",
-      "mcp__jupyter__read_cell",
-      "mcp__jupyter__insert_cell",
-      "mcp__jupyter__execute_cell",
-      "mcp__jupyter__insert_execute_code_cell",
-      "mcp__jupyter__overwrite_cell_source",
-      "mcp__jupyter__delete_cell",
-      "mcp__jupyter__execute_code",
-      "mcp__jupyter__restart_notebook",
-      "mcp__jupyter__list_files"
+      "mcp__jupyter_executor__create_python_cell"
     ]
-  },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": [
-    "jupyter"
-  ]
+  }
 }
