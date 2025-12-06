@@ -1,12 +1,12 @@
 # notellm
 
-A command-line tool for creating Jupyter + Claude Code workspaces optimized for AI-assisted data science.
+A streamlined development environment for iterative notebook development combining:
+- Jupyter notebooks for interactive data science
+- Claude Code for AI-assisted development
+- Work directly in notebooks with `%cc` magic for AI assistance and `%%nb_modify` for iterative code refinement
+- Built-in notebook helpers for cell organization and management
 
-**notellm** gives you two powerful ways to work with Claude and Jupyter:
-1. **From the outside** — Use Claude Code in your terminal to read, write, and execute notebook cells via the Jupyter MCP Server
-2. **From the inside** — Use Claude Magic Commands (`%cc`) directly in notebook cells for quick, focused tasks
-
-Both approaches work seamlessly together in a single workspace with everything pre-configured.
+**New workflow:** Develop iteratively within notebooks using magic commands—no external MCP server required.
 
 ## Installation
 
@@ -27,173 +27,252 @@ This installs:
 
 ## Quick Start
 
+### 1. Create a new project
+
 ```bash
-# 1. Create a new project
-mkdir ~/my-analysis && cd ~/my-analysis
-
-# 2. Start JupyterLab (auto-initializes workspace)
+cd ~/projects
+mkdir my_analysis
+cd my_analysis
 notellm start
+```
 
-# 3. Patch cc_jupyter (fixes permission errors and removes decorative headers)
+This creates a workspace with JupyterLab, Claude Code integration, and notebook helpers.
+
+### 2. Patch cc_jupyter
+
+```bash
 ./patch_jupyter_magic.sh
+```
 
-# 4. Create a notebook
+This fixes permission errors and improves the notebook experience.
+
+### 3. Open JupyterLab
+
+The server URL will be displayed. Open it in your browser (typically `http://localhost:9999`).
+
+### 4. Create a notebook
+
+```bash
 notellm new exploration
+```
 
-# 5. Start Claude Code (in another terminal)
-claude
+### 5. Load magic commands
 
-# 6. Work with Claude from OUTSIDE the notebook:
-> list available notebooks
-> connect to notebooks/exploration.ipynb
-> read all cells with outputs
-> add a code cell that creates a scatter plot of price vs quantity
+In your first notebook cell:
 
-# OR work from INSIDE the notebook:
-# In a cell:
+```python
+# Load Claude Code magic
 %load_ext cc_jupyter
-%cc Create a histogram of the 'price' column
 
-# 7. When done
+# Load notebook helpers for iterative development
+import sys
+sys.path.insert(0, "..")
+%load_ext src.cc_notebook_helpers
+```
+
+### 6. Iterative Development Workflow
+
+**Generate initial code with %cc:**
+
+```python
+%cc Create a function to calculate fibonacci numbers with memoization
+```
+
+Claude will create a new cell with the fibonacci function.
+
+**Refine code iteratively with %%nb_modify:**
+
+Copy the generated function to a new cell and modify it:
+
+```python
+%%nb_modify add type hints and a docstring
+def fibonacci(n):
+    cache = {}
+    def fib(n):
+        if n in cache: return cache[n]
+        if n <= 1: return n
+        cache[n] = fib(n-1) + fib(n-2)
+        return cache[n]
+    return fib(n)
+```
+
+Run the cell—Claude will modify your code and create a new cell below with the improvements.
+
+**Continue iterating:**
+
+```python
+%%nb_modify make it iterative instead of recursive
+# [paste the improved function from the previous cell]
+```
+
+This workflow enables rapid, incremental code development entirely within the notebook.
+
+### 7. Use %cc for other tasks
+
+```python
+# Get help understanding code
+%cc Explain how this fibonacci function works
+
+# Generate visualizations
+%cc Create a plot showing fibonacci growth rate for n=1 to 20
+
+# Analyze data
+%cc Load the penguins dataset and show summary statistics
+```
+
+### 8. When done
+
+```bash
 notellm stop
 ```
 
-## Two Ways to Work with Claude
+**Key difference from traditional workflows:** Instead of switching between terminal and notebook, or using external servers, you develop iteratively within the notebook itself using `%%nb_modify` for refinements and `%cc` for new code generation.
 
-Split your screen with JupyterLab on the left and Claude Code on the right. You can interact with your notebooks using either approach—or both!
+## Magic Commands for In-Notebook Development
 
-### Working from Outside: Jupyter MCP Server
+notellm provides two types of magic commands for different purposes:
 
-Use Claude Code in your terminal to manipulate notebooks programmatically. The Jupyter MCP Server gives Claude full access to read, write, execute, and analyze cells.
+### %cc - Claude Code Magic
 
-**When to use:**
-- Complex multi-step workflows across multiple cells
-- Architecture and structural changes to notebooks
-- Analyzing outputs and iterating on results
-- Working with multiple notebooks
-- When you want Claude to see the full notebook context
+Use Claude Code directly in notebook cells for AI-assisted development.
 
-**Available Tools:**
-
-**Server Management:**
-- `list_files` — List files and directories in the Jupyter server's file system
-- `list_kernels` — List all available and running kernel sessions on the Jupyter server
-
-**Notebook Management:**
-- `use_notebook` — Connect to a notebook file, create a new one, or switch between notebooks
-- `list_notebooks` — List all notebooks available on the Jupyter server and their status
-- `restart_notebook` — Restart the kernel for a specific managed notebook
-- `unuse_notebook` — Disconnect from a specific notebook and release its resources
-- `read_notebook` — Read notebook cells source content with brief or detailed format options
-
-**Cell Operations:**
-- `read_cell` — Read the full content (Metadata, Source and Outputs) of a single cell
-- `insert_cell` — Insert a new code or markdown cell at a specified position
-- `delete_cell` — Delete a cell at a specified index
-- `overwrite_cell_source` — Overwrite the source code of an existing cell
-
-**Code Execution:**
-- `execute_cell` — Execute a cell with timeout, supports multimodal output including images
-- `insert_execute_code_cell` — Insert a new code cell and execute it in one step
-- `execute_code` — Execute code directly in the kernel, supports magic commands and shell commands
-
-**JupyterLab Integration:**
-- `notebook_run-all-cells` — Execute all cells in the current notebook sequentially (JupyterLab mode only)
-
-**Configuration:**
-
-The Jupyter MCP Server is automatically configured in `.mcp.json` when you run `notellm start`. Claude Code will connect to your JupyterLab instance using the port and token from `.env.jupyter`.
-
-### Working from Inside: Claude Magic Commands
-
-Use `%cc` Claude Magic Commands directly in notebook cells for quick, focused prompts. Perfect for iterative development and exploratory analysis.
-
-**When to use:**
-- Quick iterations on a single task
-- Focused code generation in one cell
-- Exploratory data analysis
-- When you're already working in the notebook
-- Rapid prototyping and experimentation
-
-**Features:**
-- Full agentic Claude Code execution
-- Cell-based code approval workflow
-- Real-time message streaming
-- Session state preservation
-- Conversation continuity across cells
-
-**Basic Usage:**
+**Basic usage:**
 
 ```python
-%load_ext cc_jupyter
-
-# Single line
-%cc Create a histogram of the 'price' column
-
-# Multi-line
-%%cc
-Group by category
-Calculate mean and median
-Create a comparison bar chart
+%cc <instruction>          # Single-line prompt
+%%cc <instruction>         # Multi-line prompt
+Code context here...
 ```
 
-**Starting fresh vs continuing:**
+**Examples:**
 
 ```python
-%cc <instructions>       # Continue with additional instructions (one-line)
-%%cc <instructions>      # Continue with additional instructions (multi-line)
-%cc_new (or %ccn)        # Start fresh conversation
-%cc --help               # Show available options and usage information
+# Generate new code
+%cc Create a function to load CSV files with polars
+
+# Analyze existing code
+%cc Explain what this function does and suggest improvements
+
+# Generate visualizations
+%cc Create a scatter plot of price vs. size with altair
 ```
 
-**Context Management:**
+**Available options:**
 
 ```python
-%cc --import <file>       # Add a file to be included in initial conversation messages
-%cc --add-dir <dir>       # Add a directory to Claude's accessible directories
-%cc --mcp-config <file>   # Set path to a .mcp.json file containing MCP server configurations
-%cc --cells-to-load <num> # The number of cells to load into a new conversation (default: all for first %cc, none for %cc_new)
+# Conversation management
+%cc_new                    # Start fresh conversation (alias: %ccn)
+
+# Context management
+%cc --import <file>        # Include file in conversation
+%cc --add-dir <dir>        # Add directory to accessible paths
+%cc --cells-to-load <num>  # Number of cells to load (default: all)
+
+# Output control
+%cc --model <name>         # Model: sonnet (default), opus, haiku
+%cc --max-cells <num>      # Max cells created per turn (default: 3)
+
+# Display options
+%cc --clean                # Replace prompt cells with code cells
+%cc --no-clean             # Keep prompt cells (default)
 ```
 
-**Output Control:**
+**Built-in tools available to %cc:**
+- `Bash` - Run shell commands
+- `Read` - Read files
+- `Write` - Create new files
+- `Edit` - Modify existing files
+- `Grep` - Search file contents
+- `WebSearch` - Search the web
+- `WebFetch` - Fetch web content
+
+---
+
+### %%nb_modify - Iterative Code Refinement
+
+**The primary tool for iterative notebook development.**
+
+Modify code in the current cell using Claude. The modified code appears in a new cell below, enabling rapid iteration.
+
+**Usage pattern:**
 
 ```python
-%cc --model <name>       # Model to use for Claude Code (default: sonnet)
-%cc --max-cells <num>    # Set the maximum number of cells CC can create per turn (default: 3)
+%%nb_modify <instruction>
+<code to modify>
 ```
 
-**Display Options:**
+**Example workflow:**
 
 ```python
-%cc --clean              # Replace prompt cells with Claude's code cells (tell us if you like this feature, maybe it should be the default)
-%cc --no-clean           # Turn off the above setting (default)
+# Initial code
+def process_data(df):
+    return df.filter(pl.col("age") > 18)
 ```
 
-**Notes:**
-- Restart the kernel to stop the Claude session
-- Documentation: go/claude-code-jupyter
+```python
+# Refine it
+%%nb_modify add parameter for minimum age, add type hints, add docstring
+def process_data(df):
+    return df.filter(pl.col("age") > 18)
+```
 
-## Choosing Your Workflow
+Result: New cell created with improved code.
 
-**Use Jupyter MCP Server (terminal) when:**
-- You need to work across multiple cells systematically
-- You're making structural changes to the notebook
-- You want to analyze outputs and iterate based on results
-- You need the full notebook context
-- You're debugging or refactoring existing code
+```python
+# Continue refining
+%%nb_modify also filter out null values in the age column
+def process_data(df: pl.DataFrame, min_age: int = 18) -> pl.DataFrame:
+    """Filter dataframe to include only records above minimum age."""
+    return df.filter(pl.col("age") > min_age)
+```
 
-**Use Claude Magic Commands (in cells) when:**
-- You want quick code generation for a specific task
-- You're doing exploratory analysis and iterating rapidly
-- You're already working in the notebook and want inline help
-- You need a single focused operation
-- You want minimal context switching
+Result: Another new cell with further improvements.
 
-**Use both together:**
-- Start with MCP Server to set up notebook structure and load data
-- Switch to Claude Magic Commands for rapid iteration on visualizations
-- Use MCP Server to review outputs and make coordinated changes
-- Use Claude Magic Commands for quick fixes and experiments
+**Why %%nb_modify?**
+- Fast iteration without leaving the notebook
+- Preserves your code history in cells
+- No need to describe location—operates on "this cell"
+- Clean output—only the modified code, no magic command in result
+
+---
+
+### %nb - Notebook Organization (Optional)
+
+Helper commands for organizing and navigating large notebooks. **These are optional**—use them only if they add value to your workflow.
+
+**Available commands:**
+
+```python
+%nb_list                        # List all cells with context
+%nb_list --show-empty           # Include empty cells
+
+%nb_find <query>                # Search cells by name/content/tags
+%nb_find --name <query>         # Search only cell names
+%nb_find --content <query>      # Search only cell content
+
+%nb_name <index> <name>         # Name a cell for reference
+%nb_tag <index> <tags...>       # Tag cells for organization
+%nb_section <header>            # Find cells under markdown header
+
+%nb_set <path>                  # Manually set notebook path
+```
+
+**Example use case:**
+
+```python
+# Name important cells for documentation
+%nb_name 5 data_loading
+%nb_name 12 model_training
+%nb_name 20 visualization
+
+# List to see structure
+%nb_list
+
+# Find specific functionality
+%nb_find model_training
+```
+
+**Note:** Cell naming is purely organizational. For iterative development, use `%%nb_modify` which operates on the current cell without needing names.
 
 ## Commands
 
@@ -212,15 +291,15 @@ notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 **Behavior:**
 - If no config exists OR options provided: initializes workspace first
 - Otherwise: uses existing configuration
-- Always keeps `.mcp.json` in sync with running server
 
 **Creates (on first run):**
 - `pyproject.toml` — Python dependencies
 - `CLAUDE.md` — Instructions for Claude Code
-- `.mcp.json` — MCP server configuration
+- `.claude/settings.json` — Claude Code permissions
 - `.env.jupyter` — Port and token config
+- `src/` — Notebook helper utilities
 - `patch_jupyter_magic.sh` — Patch script for cc_jupyter fixes (run after first install)
-- `notebooks/`, `data/`, `src/`, `figures/` directories
+- `notebooks/`, `data/`, `figures/` directories
 
 ### `notellm stop`
 
@@ -261,7 +340,7 @@ notellm clean --purge     # Remove everything including dependencies
 ```
 
 **Default behavior:**
-- Removes: `.env.jupyter`, `.mcp.json`, `.jupyter.pid`, `.jupyter.log`
+- Removes: `.env.jupyter`, `.jupyter.pid`, `.jupyter.log`
 - Refuses to clean if server is running (run `notellm stop` first)
 - Preserves all user files and directories
 
@@ -346,7 +425,7 @@ Workspaces include these Python packages:
 | matplotlib | Plotting |
 | seaborn | Statistical visualization |
 | jupyterlab | Notebook interface |
-| jupyter-collaboration | Real-time collaboration (MCP) |
+| jupyter-collaboration | Real-time collaboration support |
 | claude-code-jupyter-staging | Claude Magic Commands |
 
 ## Requirements
