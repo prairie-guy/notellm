@@ -38,13 +38,15 @@ notellm start
 
 This creates a workspace with JupyterLab, Claude Code integration, and notebook helpers.
 
-### 2. Patch cc_jupyter
+### 2. Start the server
+
+Patches are applied automatically:
 
 ```bash
-./patch_jupyter_magic.sh
+notellm start
 ```
 
-This fixes permission errors and improves the notebook experience.
+The first start will apply cc_jupyter patches automatically (see Technical Details below).
 
 ### 3. Open JupyterLab
 
@@ -290,8 +292,7 @@ notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 - `CLAUDE.md` — Instructions for Claude Code
 - `.claude/settings.json` — Claude Code permissions
 - `.env.jupyter` — Port and token config
-- `src/` — Notebook helper utilities
-- `patch_jupyter_magic.sh` — Patch script for cc_jupyter fixes (run after first install)
+- `src/` — Notebook helper utilities and patcher
 - `notebooks/`, `data/`, `figures/` directories
 
 ### `notellm stop`
