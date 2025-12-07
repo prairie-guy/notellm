@@ -143,7 +143,7 @@ ${YELLOW}STOP OPTIONS:${NC}
     -p, --port PORT     Stop all processes on specific port
 
 ${YELLOW}CLEAN OPTIONS:${NC}
-    --purge             Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md
+    --purge             Also remove .venv, uv.lock, CLAUDE.md (preserves pyproject.toml)
 
 ${YELLOW}NEW OPTIONS:${NC}
     -d, --dir DIR       Directory for notebook (default: notebooks/)
@@ -262,17 +262,24 @@ do_init() {
     
     # Copy templates
     log_step "Copying template files..."
-    
+
     if [ ! -d "$INSTALL_DIR/templates" ]; then
         log_error "Templates not found at $INSTALL_DIR/templates"
         echo "Try: notellm update"
         exit 1
     fi
-    
-    cp "$INSTALL_DIR/templates/pyproject.toml" .
-    cp "$INSTALL_DIR/templates/CLAUDE.md" .
 
-    log_info "Templates copied"
+    # Only copy pyproject.toml if it doesn't exist (preserve user customizations)
+    if [ ! -f "pyproject.toml" ]; then
+        cp "$INSTALL_DIR/templates/pyproject.toml" .
+        log_info "Created pyproject.toml"
+    else
+        log_info "Preserved existing pyproject.toml (skipped template copy)"
+    fi
+
+    # Always update CLAUDE.md (contains port/token info)
+    cp "$INSTALL_DIR/templates/CLAUDE.md" .
+    log_info "Updated CLAUDE.md"
     
     # Generate .env.jupyter
     log_step "Generating configuration..."
@@ -797,15 +804,15 @@ ${YELLOW}USAGE:${NC}
     notellm clean [options]
 
 ${YELLOW}OPTIONS:${NC}
-    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md, .claude/, src/, .jupyter*, and uv cache
+    --purge     Also remove .venv, uv.lock, CLAUDE.md, .claude/, src/, .jupyter*, and uv cache
     -h, --help  Show this help
 
 ${YELLOW}BEHAVIOR:${NC}
     Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log
-    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md, .claude/, src/,
+    --purge: Also removes .venv/, uv.lock, CLAUDE.md, .claude/, src/,
              .jupyter_ystore.db, and cleans uv cache for patched packages (claude-code-jupyter-staging)
 
-    User files are always preserved: notebooks/, data/, figures/, *.ipynb
+    User files are always preserved: notebooks/, data/, figures/, *.ipynb, pyproject.toml
 
 ${YELLOW}EXAMPLES:${NC}
     notellm clean           # Remove config files only
@@ -842,7 +849,7 @@ EOF
     if [ "$purge" = true ]; then
         [ -d ".venv" ] && files_to_remove+=(".venv/")
         [ -f "uv.lock" ] && files_to_remove+=("uv.lock")
-        [ -f "pyproject.toml" ] && files_to_remove+=("pyproject.toml")
+        # pyproject.toml is preserved (user may have customized dependencies)
         [ -f "CLAUDE.md" ] && files_to_remove+=("CLAUDE.md")
         [ -d ".claude" ] && files_to_remove+=(".claude/")
         [ -d "src" ] && files_to_remove+=("src/")
@@ -907,7 +914,7 @@ EOF
     echo ""
     log_info "Workspace cleaned"
     echo ""
-    echo "User files preserved: notebooks/, data/, src/, figures/, *.ipynb"
+    echo "User files preserved: notebooks/, data/, figures/, *.ipynb, pyproject.toml"
     echo "To reinitialize: notellm start"
     echo ""
 }

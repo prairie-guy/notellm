@@ -296,9 +296,10 @@ notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 **Behavior:**
 - If no config exists OR options provided: initializes workspace first
 - Otherwise: uses existing configuration
+- **Never overwrites existing `pyproject.toml`** — your customizations are preserved
 
 **Creates (on first run):**
-- `pyproject.toml` — Python dependencies
+- `pyproject.toml` — Python dependencies (only if doesn't exist)
 - `CLAUDE.md` — Instructions for Claude Code
 - `.claude/settings.json` — Claude Code permissions
 - `.env.jupyter` — Port and token config
@@ -349,11 +350,12 @@ notellm clean --purge     # Remove everything including dependencies
 - Preserves all user files and directories
 
 **With --purge:**
-- Also removes: `.venv/`, `uv.lock`, `pyproject.toml`, `CLAUDE.md`, `.jupyter_ystore.db`, and any other `.jupyter*` files
+- Also removes: `.venv/`, `uv.lock`, `CLAUDE.md`, `.jupyter_ystore.db`, and any other `.jupyter*` files
 - Requires confirmation before proceeding
 - Use when you want to completely reset the workspace
 
 **Always preserved:**
+- **`pyproject.toml`** - User may have customized dependencies (e.g., changed JupyterLab version)
 - User directories: `notebooks/`, `data/`, `src/`, `figures/`
 - Jupyter notebooks: All `*.ipynb` files
 - Any other user-created files
@@ -478,6 +480,24 @@ jupyter lab --YDocExtension.disable_rtc=True
 This prevents the cell duplication issue while maintaining all other JupyterLab functionality.
 
 **Impact:** Real-time collaboration between multiple users editing the same notebook is disabled, but single-user workflows (the primary use case for notellm) are unaffected.
+
+### JupyterLab Version Pinning
+
+**Version Pinned:** `jupyterlab==4.0.9`
+
+**Issue:** iPad Pro users experience an extra line bug when entering text within a cell. After pressing Shift-Return to execute a cell, JupyterLab 4.2+ adds an unwanted newline into the cell before execution, whereas version 4.0.9 executes the cell without adding the extra line.
+
+**Related Issues:**
+- [Configure Shift-Return to only Execute a Code Cell and Not Enter a new line](https://discourse.jupyter.org/t/configure-shift-return-to-only-execute-a-code-cell-and-not-enter-a-new-line-into-the-cell/25608) - Jupyter Discourse (May 2024)
+- iPad keyboard input handling has general compatibility issues in JupyterLab 4.2+
+
+**For non-iPad users:** If you don't experience this issue, you can change the version constraint in `pyproject.toml`:
+
+```toml
+"jupyterlab>=4.2",  # Instead of jupyterlab==4.0.9
+```
+
+Then run `uv sync` to upgrade to the latest version.
 
 ## Dependencies
 
