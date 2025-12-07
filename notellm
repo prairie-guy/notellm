@@ -115,6 +115,7 @@ ${YELLOW}COMMANDS:${NC}
     status              Show configured server and all running Jupyter Lab instances
     clean [options]     Remove configuration files
     new <name>          Create a new notebook with boilerplate
+    test                Copy test suite to notebooks/ for manual execution
     update              Update notellm to latest version
     version             Show version information
     help                Show this help message
@@ -145,6 +146,7 @@ ${YELLOW}EXAMPLES:${NC}
     notellm clean                   # Remove config files
     notellm clean --purge           # Remove config + dependencies
     notellm new my_analysis         # Create notebooks/my_analysis.ipynb
+    notellm test                    # Copy test suite for manual execution
 
 ${YELLOW}WORKFLOW:${NC}
     1. cd ~/my-project
@@ -482,23 +484,26 @@ EOF
     if [ "$foreground" = true ]; then
         log_info "Starting in foreground (Ctrl+C to stop)..."
         echo ""
+        # Disable RTC to prevent cell duplication bug (jupyterlab/jupyterlab#15544)
         uv run jupyter lab \
             --ip "$JUPYTER_HOST" \
             --port "$JUPYTER_PORT" \
             --port-retries=0 \
             --IdentityProvider.token="$JUPYTER_TOKEN" \
             --ServerApp.allow_remote_access=true \
+            --YDocExtension.disable_rtc=True \
             --no-browser \
             --notebook-dir=.
     else
         log_step "Starting in background..."
-
+        # Disable RTC to prevent cell duplication bug (jupyterlab/jupyterlab#15544)
         nohup uv run jupyter lab \
             --ip "$JUPYTER_HOST" \
             --port "$JUPYTER_PORT" \
             --port-retries=0 \
             --IdentityProvider.token="$JUPYTER_TOKEN" \
             --ServerApp.allow_remote_access=true \
+            --YDocExtension.disable_rtc=True \
             --no-browser \
             --notebook-dir=. \
             > "$LOG_FILE" 2>&1 &
@@ -757,15 +762,15 @@ ${YELLOW}USAGE:${NC}
     notellm clean [options]
 
 ${YELLOW}OPTIONS:${NC}
-    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md, .claude/, .jupyter*, and uv cache
+    --purge     Also remove .venv, uv.lock, pyproject.toml, CLAUDE.md, .claude/, src/, .jupyter*, and uv cache
     -h, --help  Show this help
 
 ${YELLOW}BEHAVIOR:${NC}
     Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log
-    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md, .claude/, .jupyter_ystore.db,
-             and cleans uv cache for patched packages (claude-code-jupyter-staging)
+    --purge: Also removes .venv/, uv.lock, pyproject.toml, CLAUDE.md, .claude/, src/,
+             .jupyter_ystore.db, and cleans uv cache for patched packages (claude-code-jupyter-staging)
 
-    User files are preserved: notebooks/, data/, src/, figures/, *.ipynb
+    User files are always preserved: notebooks/, data/, figures/, *.ipynb
 
 ${YELLOW}EXAMPLES:${NC}
     notellm clean           # Remove config files only
@@ -805,6 +810,7 @@ EOF
         [ -f "pyproject.toml" ] && files_to_remove+=("pyproject.toml")
         [ -f "CLAUDE.md" ] && files_to_remove+=("CLAUDE.md")
         [ -d ".claude" ] && files_to_remove+=(".claude/")
+        [ -d "src" ] && files_to_remove+=("src/")
 
         # Add all .jupyter* files and directories (except .jupyter.pid and .jupyter.log which are already included)
         for item in .jupyter*; do
@@ -1147,6 +1153,62 @@ EOF
 }
 
 #######################################
+# Command: test
+#######################################
+
+cmd_test() {
+    banner "notellm Test Suite"
+
+    # Copy template
+    local dest="$NOTEBOOKS_DIR/TestSuite.ipynb"
+
+    if [ ! -d "$INSTALL_DIR/templates" ]; then
+        log_error "Templates not found at $INSTALL_DIR/templates"
+        echo "Try: notellm update"
+        exit 1
+    fi
+
+    if [ ! -f "$INSTALL_DIR/templates/TestSuite.ipynb" ]; then
+        log_error "TestSuite.ipynb template not found"
+        echo "Expected: $INSTALL_DIR/templates/TestSuite.ipynb"
+        exit 1
+    fi
+
+    mkdir -p "$NOTEBOOKS_DIR"
+    cp "$INSTALL_DIR/templates/TestSuite.ipynb" "$dest"
+
+    echo ""
+    log_info "Test suite copied successfully"
+    echo ""
+    echo -e "${YELLOW}Next steps:${NC}"
+
+    # Show URL if server is running
+    if [ -f "$CONFIG_FILE" ] && is_jupyter_running; then
+        source "$CONFIG_FILE"
+        echo "  1. Open JupyterLab:"
+
+        # Display URL using same logic as cmd_status
+        if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+            local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+            echo "     http://${hostname_url}:${JUPYTER_PORT}/lab?token=${JUPYTER_TOKEN}"
+        else
+            echo "     http://${JUPYTER_HOST}:${JUPYTER_PORT}/lab?token=${JUPYTER_TOKEN}"
+        fi
+    else
+        echo "  1. Start server: notellm start"
+    fi
+
+    echo "  2. Navigate to notebooks/TestSuite.ipynb"
+    echo "  3. Execute cells sequentially or use 'Run All Cells'"
+    echo "  4. Review test results at the end of the notebook"
+    echo ""
+    echo -e "${BLUE}Note:${NC} Claude integration tests (%cc, %%cc, %%nb_modify) will"
+    echo "      create new cells dynamically. Execute generated cells manually"
+    echo "      to verify the code works correctly."
+    echo ""
+}
+
+#######################################
 # Main
 #######################################
 
@@ -1173,6 +1235,9 @@ case "$command" in
         ;;
     new)
         cmd_new "$@"
+        ;;
+    test)
+        cmd_test "$@"
         ;;
     update)
         cmd_update "$@"

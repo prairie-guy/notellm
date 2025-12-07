@@ -66,31 +66,26 @@ sys.path.insert(0, "..")  # or adjust path to reach src/
 %load_ext src.cc_notebook_helpers
 ```
 
-### Cell Identification Commands
+### Cell Organization Commands
 
-These commands help organize and reference cells by name instead of fragile numeric indices:
+These commands help navigate and organize notebook cells:
 
-- `%nb_list` - List all cells with names and context
+- `%nb_list` - List all cells
 - `%nb_list --show-empty` - Include empty cells
-- `%nb_find <query>` - Search cells by name/content/tags
-- `%nb_find --name <query>` - Search only names
-- `%nb_find --content <query>` - Search only content
-- `%nb_find --tags <query>` - Search only tags
-- `%nb_name <index> <name>` - Name a cell for stable reference
-- `%nb_tag <index> <tag1> <tag2>` - Tag cells for organization
+- `%nb_find <query>` - Search cells by content
+- `%nb_find --content <query>` - Explicit content search
 - `%nb_section <header>` - Find cells under markdown header
 
 Example workflow:
 ```python
-# Name important cells
-%nb_name 15 penguin_viz
-%nb_name 20 data_processing
-
-# List all cells with names
+# List all cells
 %nb_list
 
-# Find specific cells
-%nb_find penguin_viz
+# Find cells containing specific text
+%nb_find load_dataset
+
+# Find cells under a section
+%nb_section ## Data Loading
 ```
 
 ### Iterative Code Editing
@@ -118,22 +113,6 @@ Benefits:
 - Stays within notebook context
 - No separate terminal sessions needed
 - Uses same authentication as cc_jupyter
-
-### Cell Naming for Better Communication
-
-Cell names persist in notebook metadata and survive:
-- Cell insertions/deletions
-- Kernel restarts
-- Git operations
-
-Use names to communicate precisely:
-```python
-# Name the cell first
-%nb_name 23 old_matplotlib_viz
-
-# Then reference by index with confidence
-%cc delete cell 23
-```
 
 ## Commands
 

@@ -1,7 +1,6 @@
-"""Jupyter notebook cell identification utilities."""
+"""Jupyter notebook cell utilities."""
 import json
 from pathlib import Path
-from typing import Optional
 
 def read_notebook(nb_path: str|Path) -> dict:
     """Read notebook JSON."""
@@ -17,82 +16,31 @@ def get_cell_first_line(cell: dict, max_len: int = 60) -> str:
     first = src.split('\n')[0].strip()
     return first[:max_len] + '...' if len(first) > max_len else first
 
-def get_cell_name(cell: dict) -> Optional[str]:
-    """Get cell name from metadata."""
-    return cell.get('metadata', {}).get('name')
-
-def get_cell_tags(cell: dict) -> list[str]:
-    """Get cell tags from metadata."""
-    return cell.get('metadata', {}).get('tags', [])
-
 def list_cells(nb_path: str|Path, show_empty: bool = False) -> None:
-    """Display all cells with enhanced context."""
+    """Display all cells."""
     nb = read_notebook(nb_path)
     print(f"\nNotebook: {Path(nb_path).name}")
     print("=" * 80)
     for i, cell in enumerate(nb['cells']):
         ctype = cell['cell_type']
         first = get_cell_first_line(cell)
-        name = get_cell_name(cell)
-        tags = get_cell_tags(cell)
 
         if not show_empty and not first and ctype == 'code': continue
 
-        name_str = f" ({name})" if name else ""
-        tags_str = f" [tags: {', '.join(tags)}]" if tags else ""
-        print(f"[{i:>2}] {ctype:8} \"{first}\"{name_str}{tags_str}")
+        print(f"[{i:>2}] {ctype:8} \"{first}\"")
 
-def find_cell(nb_path: str|Path, query: str, field: str = 'all') -> list[int]:
-    """Search cells by name, content, or tags. Returns list of indices."""
+def find_cell(nb_path: str|Path, query: str, field: str = 'content') -> list[int]:
+    """Search cells by content. Returns list of indices."""
     nb = read_notebook(nb_path)
     matches = []
     q = query.lower()
 
     for i, cell in enumerate(nb['cells']):
-        if field in ('all', 'name'):
-            name = get_cell_name(cell)
-            if name and q in name.lower():
-                matches.append(i)
-                continue
-
-        if field in ('all', 'content'):
-            src = ''.join(cell['source']) if isinstance(cell['source'], list) else cell['source']
-            if q in src.lower():
-                matches.append(i)
-                continue
-
-        if field in ('all', 'tags'):
-            tags = get_cell_tags(cell)
-            if any(q in t.lower() for t in tags):
-                matches.append(i)
+        src = ''.join(cell['source']) if isinstance(cell['source'], list) else cell['source']
+        if q in src.lower():
+            matches.append(i)
 
     return matches
-
-def name_cell(nb_path: str|Path, index: int, name: str) -> None:
-    """Add/update cell name in metadata."""
-    nb = read_notebook(nb_path)
-    if index < 0 or index >= len(nb['cells']):
-        raise ValueError(f"Cell index {index} out of range (0-{len(nb['cells'])-1})")
-
-    cell = nb['cells'][index]
-    if 'metadata' not in cell: cell['metadata'] = {}
-    cell['metadata']['name'] = name
-
-    write_notebook(nb_path, nb)
-    print(f"✓ Named cell [{index}] as '{name}'")
-
-def tag_cell(nb_path: str|Path, index: int, tags: list[str]) -> None:
-    """Add/update cell tags in metadata."""
-    nb = read_notebook(nb_path)
-    if index < 0 or index >= len(nb['cells']):
-        raise ValueError(f"Cell index {index} out of range (0-{len(nb['cells'])-1})")
-
-    cell = nb['cells'][index]
-    if 'metadata' not in cell: cell['metadata'] = {}
-    cell['metadata']['tags'] = tags
-
-    write_notebook(nb_path, nb)
-    print(f"✓ Tagged cell [{index}] with: {', '.join(tags)}")
 
 def get_section_cells(nb_path: str|Path, header: str) -> list[int]:
     """Find all cells under a markdown header until next same-level header.

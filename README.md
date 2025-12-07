@@ -238,41 +238,34 @@ Result: Another new cell with further improvements.
 
 ### %nb - Notebook Organization (Optional)
 
-Helper commands for organizing and navigating large notebooks. **These are optional**—use them only if they add value to your workflow.
+Helper commands for organizing and navigating notebooks. **These are optional**—use them only if they add value to your workflow.
 
 **Available commands:**
 
 ```python
-%nb_list                        # List all cells with context
+%nb_list                        # List all cells
 %nb_list --show-empty           # Include empty cells
 
-%nb_find <query>                # Search cells by name/content/tags
-%nb_find --name <query>         # Search only cell names
-%nb_find --content <query>      # Search only cell content
+%nb_find <query>                # Search cells by content
+%nb_find --content <query>      # Explicit content search
 
-%nb_name <index> <name>         # Name a cell for reference
-%nb_tag <index> <tags...>       # Tag cells for organization
 %nb_section <header>            # Find cells under markdown header
-
-%nb_set <path>                  # Manually set notebook path
 ```
 
 **Example use case:**
 
 ```python
-# Name important cells for documentation
-%nb_name 5 data_loading
-%nb_name 12 model_training
-%nb_name 20 visualization
-
-# List to see structure
+# List all cells
 %nb_list
 
 # Find specific functionality
-%nb_find model_training
+%nb_find load_dataset
+
+# Find cells under a section
+%nb_section ## Data Loading
 ```
 
-**Note:** Cell naming is purely organizational. For iterative development, use `%%nb_modify` which operates on the current cell without needing names.
+**Note:** For iterative development, use `%%nb_modify` which operates on the current cell.
 
 ## Commands
 

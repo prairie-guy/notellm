@@ -1,4 +1,4 @@
-"""IPython magic commands for enhanced notebook cell identification."""
+"""IPython magic commands for notebook cell utilities."""
 from IPython.core.magic import Magics, line_magic, cell_magic, magics_class
 from IPython.display import display, Markdown
 from pathlib import Path
@@ -10,7 +10,7 @@ import notebook_utils as nu
 
 @magics_class
 class NotebookHelpers(Magics):
-    """Magic commands for cell identification."""
+    """Magic commands for notebook cell utilities."""
 
     def __init__(self, shell):
         super().__init__(shell)
@@ -58,36 +58,26 @@ class NotebookHelpers(Magics):
         # Fallback: require manual setting
         raise RuntimeError(
             "Could not auto-detect notebook path.\n"
-            "Use: %nb_set <notebook_path>\n"
             "Tip: Ensure JupyterLab server is running on localhost:9999"
         )
 
     @line_magic
-    def nb_set(self, line: str):
-        """Set the notebook path for subsequent commands."""
-        self._current_nb = line.strip()
-        display(Markdown(f"✓ Set notebook path to: `{self._current_nb}`"))
-
-    @line_magic
     def nb_list(self, line: str):
-        """List all cells with enhanced context."""
+        """List all cells."""
         try:
             nb_path = self._get_notebook_path()
             show_empty = '--show-empty' in line or '-a' in line
             nu.list_cells(nb_path, show_empty=show_empty)
         except Exception as e:
             print(f"Error: {e}")
-            print("\nTip: Use %nb_set <path> to manually set notebook path")
 
     @line_magic
     def nb_find(self, line: str):
-        """Find cells by name, content, or tags.
+        """Find cells by content.
 
         Usage:
-            %nb_find <query>              # Search all fields
-            %nb_find --name <query>       # Search only names
-            %nb_find --content <query>    # Search only content
-            %nb_find --tags <query>       # Search only tags
+            %nb_find <query>              # Search content
+            %nb_find --content <query>    # Explicit content search
         """
         try:
             nb_path = self._get_notebook_path()
@@ -97,14 +87,12 @@ class NotebookHelpers(Magics):
                 print("Error: No query provided")
                 return
 
-            if parts[0] in ('--name', '--content', '--tags'):
-                field = parts[0][2:]
+            if parts[0] == '--content':
                 query = parts[1] if len(parts) > 1 else ''
             else:
-                field = 'all'
                 query = line.strip()
 
-            matches = nu.find_cell(nb_path, query, field=field)
+            matches = nu.find_cell(nb_path, query)
 
             if matches:
                 print(f"\nFound {len(matches)} match(es) for '{query}':")
@@ -113,60 +101,10 @@ class NotebookHelpers(Magics):
                     cell = nb['cells'][i]
                     ctype = cell['cell_type']
                     first = nu.get_cell_first_line(cell)
-                    name = nu.get_cell_name(cell)
-                    name_str = f" ({name})" if name else ""
-                    print(f"[{i:>2}] {ctype:8} \"{first}\"{name_str}")
+                    print(f"[{i:>2}] {ctype:8} \"{first}\"")
             else:
                 print(f"\nNo matches found for '{query}'")
 
-        except Exception as e:
-            print(f"Error: {e}")
-
-    @line_magic
-    def nb_name(self, line: str):
-        """Name a cell by index.
-
-        Usage: %nb_name <index> <name>
-        """
-        try:
-            nb_path = self._get_notebook_path()
-            parts = line.strip().split(maxsplit=1)
-
-            if len(parts) != 2:
-                print("Error: Usage: %nb_name <index> <name>")
-                return
-
-            index = int(parts[0])
-            name = parts[1]
-
-            nu.name_cell(nb_path, index, name)
-
-        except ValueError as e:
-            print(f"Error: {e}")
-        except Exception as e:
-            print(f"Error: {e}")
-
-    @line_magic
-    def nb_tag(self, line: str):
-        """Tag a cell by index.
-
-        Usage: %nb_tag <index> <tag1> <tag2> ...
-        """
-        try:
-            nb_path = self._get_notebook_path()
-            parts = line.strip().split()
-
-            if len(parts) < 2:
-                print("Error: Usage: %nb_tag <index> <tag1> <tag2> ...")
-                return
-
-            index = int(parts[0])
-            tags = parts[1:]
-
-            nu.tag_cell(nb_path, index, tags)
-
-        except ValueError as e:
-            print(f"Error: {e}")
         except Exception as e:
             print(f"Error: {e}")
 
@@ -194,9 +132,7 @@ class NotebookHelpers(Magics):
                     cell = nb['cells'][i]
                     ctype = cell['cell_type']
                     first = nu.get_cell_first_line(cell)
-                    name = nu.get_cell_name(cell)
-                    name_str = f" ({name})" if name else ""
-                    print(f"[{i:>2}] {ctype:8} \"{first}\"{name_str}")
+                    print(f"[{i:>2}] {ctype:8} \"{first}\"")
             else:
                 print(f"\nNo cells found under '{header}'")
 
@@ -279,13 +215,11 @@ def load_ipython_extension(ipython):
 ✓ **Notebook Helpers loaded!**
 
 **Commands:**
-- `%nb_list` - List all cells with context
-- `%nb_find <query>` - Find cells by name/content/tags
-- `%nb_name <index> <name>` - Name a cell
-- `%nb_tag <index> <tags...>` - Tag a cell
+- `%nb_list` - List all cells
+- `%nb_find <query>` - Find cells by content
+- `%nb_find --content <query>` - Explicit content search
 - `%nb_section <header>` - Find cells under markdown header
 - `%%nb_modify <instruction>` - Modify code in this cell using Claude
-- `%nb_set <path>` - Set notebook path manually
 
 **Options:**
 - `%nb_list --show-empty` or `%nb_list -a` - Include empty cells
