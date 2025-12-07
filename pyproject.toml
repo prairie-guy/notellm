@@ -16,8 +16,8 @@ dependencies = [
     "altair>=5.3",
     "vegafusion[embed]>=1.6",
     
-    # JupyterLab + collaboration (required for MCP server)
-    "jupyterlab>=4.2",
+    # JupyterLab (4.0.9 is pinned to avoid an iPadPro "extra line" bug. )
+    "jupyterlab==4.0.9",
     "jupyter-collaboration>=3.0",
     "ipykernel>=6.29",
     
