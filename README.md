@@ -14,39 +14,13 @@ Before installing notellm, ensure you have **Claude Code CLI** installed and wor
 
 ### Installing Claude Code
 
-Claude Code is Anthropic's official CLI tool that powers the AI-assisted development features in notellm.
-
-**Quick Installation:**
-
-```bash
-# macOS, Linux, or WSL
-curl -fsSL https://claude.ai/install.sh | bash
-
-# Windows PowerShell
-irm https://claude.ai/install.ps1 | iex
-```
-
-**Alternative Installation via NPM:**
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-**Verify Installation:**
-
-```bash
-claude doctor
-```
+Follow the [Official Claude Code Setup Guide](https://code.claude.com/docs/en/setup) to install and configure the CLI.
 
 **Authentication:**
 
 After installation, authenticate with your Anthropic account. You'll need:
 - Active billing at [console.anthropic.com](https://console.anthropic.com)
 - A "Claude Code" workspace will be created automatically for usage tracking
-
-**Documentation:**
-- [Official Setup Guide](https://code.claude.com/docs/en/setup) - Anthropic's Claude Code documentation
-- [Complete Installation Guide](https://dev.to/shahidkhans/from-zero-to-ai-powered-developer-your-complete-claude-code-cli-setup-guide-4l9i) - Detailed walkthrough with troubleshooting
 
 ### Other Requirements
 
