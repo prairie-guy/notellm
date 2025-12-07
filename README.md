@@ -86,8 +86,7 @@ In your first notebook cell:
 %load_ext cc_jupyter
 
 # Load notebook helpers for iterative development
-import sys
-sys.path.insert(0, "..")
+sys.path.append("..")
 %load_ext src.cc_notebook_helpers
 ```
 

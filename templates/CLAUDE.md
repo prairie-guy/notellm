@@ -66,8 +66,7 @@ When using `%cc` commands, Claude Code has access to:
 
 Add to notebook (usually in first cell):
 ```python
-import sys
-sys.path.insert(0, "..")  # or adjust path to reach src/
+sys.path.append("..")
 %load_ext src.cc_notebook_helpers
 ```
 
