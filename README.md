@@ -368,11 +368,16 @@ notellm new exploration --dir .      # ./exploration.ipynb
 notellm new data_viz --open          # Create and open in browser
 ```
 
-Each notebook includes:
-- Title (derived from filename)
+**Template customization:**
+
+Notebooks are created from `src/template.ipynb`. Customize this template to change the default notebook structure.
+
+**Default template includes:**
+- Title (derived from filename) and date
 - Imports: polars, pandas, numpy, altair, matplotlib, seaborn
-- Configuration: display options, paths
-- Claude Magic Commands placeholder
+- Configuration: pandas, polars, matplotlib settings
+- Paths: DATA_DIR, FIGURES_DIR
+- Magic commands: `%load_ext cc_jupyter` and notebook helpers
 
 ### `notellm update`
 

@@ -80,6 +80,19 @@ is_jupyter_running() {
     return 1
 }
 
+# Display URLs consistently across all commands
+display_urls() {
+    local path_suffix="${1:-}"  # Optional path for specific notebook
+
+    if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
+        local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
+        echo "  Remote Host: http://${hostname_url}:${JUPYTER_PORT}${path_suffix}?token=${JUPYTER_TOKEN}"
+        echo "  Local Host:  http://127.0.0.1:${JUPYTER_PORT}${path_suffix}?token=${JUPYTER_TOKEN}"
+    else
+        echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}${path_suffix}?token=${JUPYTER_TOKEN}"
+    fi
+}
+
 is_process_running() {
     local pid=$1
     ps -p "$pid" > /dev/null 2>&1
@@ -308,7 +321,13 @@ EOF
         mkdir -p src
         log_info "Created empty src/"
     fi
-    
+
+    # Copy notebook template
+    if [ -f "$INSTALL_DIR/templates/template.ipynb" ]; then
+        cp "$INSTALL_DIR/templates/template.ipynb" src/template.ipynb
+        log_info "Copied notebook template (customize: src/template.ipynb)"
+    fi
+
     # Create .gitignore
     if [ ! -f .gitignore ]; then
         log_step "Creating .gitignore..."
@@ -452,13 +471,7 @@ EOF
     if is_jupyter_running; then
         log_warn "JupyterLab is already running (PID: $(cat $PID_FILE))"
         echo ""
-        if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
-            local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
-            echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-            echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-        else
-            echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-        fi
+        display_urls
         echo ""
         echo "  To stop:    notellm stop"
         exit 0
@@ -527,15 +540,9 @@ EOF
         echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"
         echo ""
 
-        # Display appropriate URL based on host
-        if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
-            local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
-            echo -e "${YELLOW}URLs:${NC}"
-            echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-            echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-        else
-            echo -e "${YELLOW}URL:${NC} http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-        fi
+        # Display URLs
+        echo -e "${YELLOW}URLs:${NC}"
+        display_urls
 
         echo ""
         echo -e "${YELLOW}Next:${NC}"
@@ -711,14 +718,8 @@ cmd_status() {
                 log_info "Server is RUNNING (PID: $pid)"
                 echo ""
 
-                # Display URLs based on host configuration
-                if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
-                    local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
-                    echo "  Hostname: http://${hostname_url}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-                    echo "  Network:  http://<network-ip>:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-                else
-                    echo "  URL: http://${JUPYTER_HOST}:${JUPYTER_PORT}?token=${JUPYTER_TOKEN}"
-                fi
+                # Display URLs
+                display_urls
             else
                 # PID file exists but process not running or not listening - clean up
                 log_warn "Server is STOPPED (cleaning up stale PID file)"
@@ -950,11 +951,12 @@ ${YELLOW}EXAMPLES:${NC}
     notellm new exploration -d .      # ./exploration.ipynb
     notellm new data_viz --open       # Create and open in browser
 
-${YELLOW}NOTEBOOK INCLUDES:${NC}
-    - Title (from filename)
+${YELLOW}NOTEBOOK TEMPLATE:${NC}
+    - Based on src/template.ipynb (customize to change defaults)
     - Imports: polars, pandas, numpy, altair, matplotlib, seaborn
-    - Configuration: display settings, paths
-    - Data loading placeholder
+    - Configuration: pandas, polars, matplotlib settings
+    - Paths: DATA_DIR, FIGURES_DIR
+    - Magic commands: %cc (Claude) and notebook helpers
 
 EOF
                 exit 0
@@ -998,10 +1000,19 @@ EOF
     
     local title=$(name_to_title "$base")
     local today=$(date '+%Y-%m-%d')
-    
+
     banner "Creating notebook"
-    
-    cat > "$path" << EOF
+
+    # Use template if available
+    local template_file="src/template.ipynb"
+    if [ -f "$template_file" ]; then
+        # Copy template and replace placeholders
+        sed -e "s/{{TITLE}}/$title/g" \
+            -e "s/{{DATE}}/$today/g" \
+            "$template_file" > "$path"
+    else
+        # Fallback to minimal notebook if template missing
+        cat > "$path" << EOF
 {
  "cells": [
   {
@@ -1137,8 +1148,10 @@ EOF
  "nbformat_minor": 4
 }
 EOF
+    fi
 
     log_info "Created: $path"
+    log_info "Customize default template: src/template.ipynb"
     
     echo ""
     echo -e "${YELLOW}Contents:${NC}"
@@ -1156,9 +1169,9 @@ EOF
         if [ -f "$CONFIG_FILE" ]; then
             source "$CONFIG_FILE"
             if is_jupyter_running; then
-                local url="http://localhost:${JUPYTER_PORT}/lab/tree/${path}?token=${JUPYTER_TOKEN}"
+                local url="http://127.0.0.1:${JUPYTER_PORT}/lab/tree/${path}?token=${JUPYTER_TOKEN}"
                 log_info "Opening in browser..."
-                
+
                 if command -v xdg-open &> /dev/null; then
                     xdg-open "$url" 2>/dev/null &
                 elif command -v open &> /dev/null; then
@@ -1174,7 +1187,7 @@ EOF
         if [ -f "$CONFIG_FILE" ] && is_jupyter_running; then
             source "$CONFIG_FILE"
             echo -e "${YELLOW}Open in JupyterLab:${NC}"
-            echo "  http://localhost:${JUPYTER_PORT}/lab/tree/${path}?token=${JUPYTER_TOKEN}"
+            display_urls "/lab/tree/${path}"
         else
             echo -e "${YELLOW}Start server:${NC} notellm start"
         fi
@@ -1220,14 +1233,8 @@ cmd_test() {
     if [ -f "$CONFIG_FILE" ] && is_jupyter_running; then
         source "$CONFIG_FILE"
         echo "  1. Open JupyterLab:"
-
-        # Display URL using same logic as cmd_status
-        if [ "$JUPYTER_HOST" = "0.0.0.0" ]; then
-            local hostname_url="${JUPYTER_HOSTNAME:-$(hostname)}"
-            echo "     http://${hostname_url}:${JUPYTER_PORT}/lab?token=${JUPYTER_TOKEN}"
-        else
-            echo "     http://${JUPYTER_HOST}:${JUPYTER_PORT}/lab?token=${JUPYTER_TOKEN}"
-        fi
+        echo ""
+        display_urls "/lab"
     else
         echo "  1. Start server: notellm start"
     fi
