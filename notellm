@@ -258,8 +258,6 @@ do_init() {
     
     cp "$INSTALL_DIR/templates/pyproject.toml" .
     cp "$INSTALL_DIR/templates/CLAUDE.md" .
-    cp "$INSTALL_DIR/templates/patch_jupyter_magic.sh" .
-    chmod +x patch_jupyter_magic.sh
 
     log_info "Templates copied"
     
@@ -303,7 +301,8 @@ EOF
     log_step "Copying notebook helpers..."
     if [ -d "$INSTALL_DIR/templates/src" ]; then
         cp -r "$INSTALL_DIR/templates/src" .
-        log_info "Copied src/ with notebook helper utilities"
+        chmod +x src/patch_jupyter_magic.sh 2>/dev/null || true
+        log_info "Copied src/ with notebook helper utilities and patcher"
     else
         # Fallback to creating empty src/ if templates don't have it
         mkdir -p src
@@ -546,6 +545,41 @@ EOF
         echo ""
         echo -e "${YELLOW}Logs:${NC} $LOG_FILE"
         echo ""
+
+        # Apply cc_jupyter patches
+        echo -e "${BLUE}Applying cc_jupyter patches...${NC}"
+        if [ -f "src/patch_jupyter_magic.sh" ]; then
+            if src/patch_jupyter_magic.sh 2>&1 | tee -a "$LOG_FILE"; then
+                echo ""
+            else
+                PATCH_EXIT=$?
+                # Check if it was just "already applied"
+                if grep -q "patch(es) skipped (already applied)" "$LOG_FILE" 2>/dev/null; then
+                    echo -e "${YELLOW}Patches already applied${NC}"
+                    echo ""
+                else
+                    # Genuine failure - abort
+                    echo ""
+                    echo -e "${RED}╔════════════════════════════════════════════════╗${NC}"
+                    echo -e "${RED}║           PATCH APPLICATION FAILED             ║${NC}"
+                    echo -e "${RED}╚════════════════════════════════════════════════╝${NC}"
+                    echo ""
+                    echo "Server is running but cc_jupyter patches failed to apply."
+                    echo "Check output above for details."
+                    echo ""
+                    echo "To retry manually:"
+                    echo "  src/patch_jupyter_magic.sh"
+                    echo ""
+                    echo -e "${RED}Stopping server due to patch failure...${NC}"
+                    kill $(cat "$PID_FILE") 2>/dev/null || true
+                    rm -f "$PID_FILE"
+                    exit 1
+                fi
+            fi
+        else
+            echo -e "${YELLOW}No src/patch_jupyter_magic.sh found (skipping)${NC}"
+            echo ""
+        fi
     fi
 }
 
@@ -1199,7 +1233,7 @@ cmd_test() {
     fi
 
     echo "  2. Navigate to notebooks/TestSuite.ipynb"
-    echo "  3. Execute cells sequentially or use 'Run All Cells'"
+    echo "  3. Execute cells sequentially"
     echo "  4. Review test results at the end of the notebook"
     echo ""
     echo -e "${BLUE}Note:${NC} Claude integration tests (%cc, %%cc, %%nb_modify) will"

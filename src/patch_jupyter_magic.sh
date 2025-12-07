@@ -6,7 +6,7 @@ set -euo pipefail
 # Add new patches by creating new patch_xxx() functions
 #######################################
 
-VERSION="3.1.0"
+VERSION="4.0.0"
 
 # Colors for output
 RED='\033[0;31m'
@@ -191,154 +191,6 @@ PYTHON_SCRIPT
     fi
 }
 
-#######################################
-# PATCH 4: Set Working Directory from MCP Config Location
-#######################################
-patch_cwd_from_mcp_config() {
-    local cc_jupyter_path="$1"
-    local magics_file="$cc_jupyter_path/magics.py"
-
-    echo -e "${BLUE}[PATCH 4]${NC} Set Working Directory from MCP Config Location"
-
-    if [ ! -f "$magics_file" ]; then
-        echo -e "${RED}  ✗ SKIP${NC} - magics.py not found"
-        return 1
-    fi
-
-    # Check if already patched (look for the explicit settings path code)
-    if grep -q "settings_local_path = project_root" "$magics_file"; then
-        echo -e "${GREEN}  ✓ SKIP${NC} - Already applied"
-        return 0
-    fi
-
-    echo -e "${YELLOW}  → Applying...${NC}"
-
-    # Create backup
-    cp "$magics_file" "${magics_file}.backup.$(date +%Y%m%d_%H%M%S)"
-
-    # Apply patch using Python
-    export MAGICS_FILE="$magics_file"
-    python3 << 'PYTHON_SCRIPT'
-import os
-
-magics_file = os.environ['MAGICS_FILE']
-
-with open(magics_file, 'r') as f:
-    lines = f.readlines()
-
-patched = False
-new_lines = []
-i = 0
-
-while i < len(lines):
-    line = lines[i]
-
-    # Find where we need to add the import (after other imports, before class definition)
-    if 'from .prompt_builder import PromptBuilder, get_system_prompt' in line:
-        new_lines.append(line)
-        # Check if Path is already imported
-        if i + 1 < len(lines) and 'from pathlib import Path' not in ''.join(lines[:i+1]):
-            # Add Path import if not already there
-            new_lines.append('from pathlib import Path\n')
-        i += 1
-        continue
-
-    # Find the section where remote_dev cwd setting happens
-    if 'remote_dev_monorepo_root = Path("/root/code")' in line:
-        # Get the indentation
-        indent = len(line) - len(line.lstrip())
-        base_indent = ' ' * indent
-
-        # Add the patch before the remote dev logic
-        new_lines.append(f"{base_indent}# PATCH: Set cwd from MCP config file location\n")
-        new_lines.append(f"{base_indent}# This ensures Claude SDK can find .claude/settings.local.json\n")
-        new_lines.append(f"{base_indent}if self._config_manager.mcp_config_file:\n")
-        new_lines.append(f"{base_indent}    project_root = Path(self._config_manager.mcp_config_file).parent\n")
-        new_lines.append(f"{base_indent}    options.cwd = str(project_root)\n")
-        new_lines.append(f"{base_indent}    \n")
-        new_lines.append(f"{base_indent}    # Always pass settings file path (overrides any JSON)\n")
-        new_lines.append(f"{base_indent}    settings_local_path = project_root / \".claude\" / \"settings.local.json\"\n")
-        new_lines.append(f"{base_indent}    if settings_local_path.exists():\n")
-        new_lines.append(f"{base_indent}        options.settings = str(settings_local_path)\n")
-        new_lines.append(f"{base_indent}\n")
-        new_lines.append(f"{base_indent}# Original remote dev logic (kept for compatibility)\n")
-        new_lines.append(line)
-
-        patched = True
-        i += 1
-        continue
-
-    new_lines.append(line)
-    i += 1
-
-if patched:
-    with open(magics_file, 'w') as f:
-        f.writelines(new_lines)
-    exit(0)
-else:
-    exit(1)
-PYTHON_SCRIPT
-
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}  ✓ SUCCESS${NC}"
-        return 0
-    else
-        echo -e "${RED}  ✗ FAILED${NC} - Could not find target code"
-        return 1
-    fi
-}
-
-#######################################
-# Main Execution
-#######################################
-
-#######################################
-# PATCH 5: Rename SDK Server to Avoid Conflict
-#######################################
-patch_rename_sdk_server() {
-    local cc_jupyter_path="$1"
-    local magics_file="$cc_jupyter_path/magics.py"
-    local constants_file="$cc_jupyter_path/constants.py"
-
-    echo -e "${BLUE}[PATCH 5]${NC} Rename SDK Server to Avoid Conflict"
-
-    if [ ! -f "$magics_file" ] || [ ! -f "$constants_file" ]; then
-        echo -e "${RED}  ✗ SKIP${NC} - Required files not found"
-        return 1
-    fi
-
-    # Check if already patched
-    if grep -q 'mcp__jupyter_executor__create_python_cell' "$constants_file"; then
-        echo -e "${GREEN}  ✓ SKIP${NC} - Already applied"
-        return 0
-    fi
-
-    echo -e "${YELLOW}  → Applying...${NC}"
-
-    # Create backups
-    cp "$magics_file" "${magics_file}.backup.$(date +%Y%m%d_%H%M%S)"
-    cp "$constants_file" "${constants_file}.backup.$(date +%Y%m%d_%H%M%S)"
-
-    # Patch constants.py - change tool name constant
-    sed -i 's/EXECUTE_PYTHON_TOOL_NAME = "mcp__jupyter__create_python_cell"/EXECUTE_PYTHON_TOOL_NAME = "mcp__jupyter_executor__create_python_cell"/' "$constants_file"
-
-    # Patch magics.py - change server name in mcp_servers dict
-    sed -i 's/"jupyter": sdk_server/"jupyter_executor": sdk_server/' "$magics_file"
-
-    # Patch magics.py - change tool name in allowed_tools list
-    sed -i 's/"mcp__jupyter__create_python_cell"/"mcp__jupyter_executor__create_python_cell"/' "$magics_file"
-
-    # Verify patches
-    if grep -q 'mcp__jupyter_executor__create_python_cell' "$constants_file" && \
-       grep -q '"jupyter_executor": sdk_server' "$magics_file" && \
-       grep -q '"mcp__jupyter_executor__create_python_cell"' "$magics_file"; then
-        echo -e "${GREEN}  ✓ SUCCESS${NC}"
-        return 0
-    else
-        echo -e "${RED}  ✗ FAILED${NC} - Verification failed"
-        return 1
-    fi
-}
 
 #######################################
 # Main Script
@@ -363,8 +215,7 @@ echo ""
 PATCH_FUNCTIONS=(
     "patch_permission_error"
     "patch_decorative_headers"
-    "patch_cwd_from_mcp_config"
-    "patch_rename_sdk_server"
+    # Removed PATCH 4 (MCP config) and PATCH 5 (server renaming) - no longer needed
     # Add new patches here:
     # "patch_another_fix"
 )
@@ -402,7 +253,8 @@ fi
 echo ""
 
 if [ $PATCHES_FAILED -eq 0 ]; then
-    echo "Ready to test! Run in Jupyter:"
+    echo "Ready to use! Test in Jupyter:"
+    echo "  %load_ext cc_jupyter"
     echo "  %cc write factorial function"
     exit 0
 else

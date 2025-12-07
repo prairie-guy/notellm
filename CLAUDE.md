@@ -3,8 +3,8 @@
 ## Environment
 
 - Python 3.12 managed via `uv`
-- JupyterLab running on port {{PORT}}
-- Token: {{TOKEN}}
+- JupyterLab running on port 9999
+- Token: notellm-0f94a4fa4d3feade
 
 ## Directory Structure
 

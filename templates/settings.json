@@ -10,7 +10,7 @@
       "Write",
       "WebSearch",
       "WebFetch",
-      "mcp__jupyter_executor__create_python_cell"
+      "mcp__jupyter__create_python_cell"
     ]
   }
 }
