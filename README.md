@@ -84,7 +84,7 @@ Claude will create a new cell with the fibonacci function.
 
 **Refine code iteratively with %%nb_modify:**
 
-Copy the generated function to a new cell and modify it:
+Add `%%nb_modify` to the cell with your code:
 
 ```python
 %%nb_modify add type hints and a docstring
@@ -102,9 +102,19 @@ Run the cell—Claude will modify your code and create a new cell below with the
 
 **Continue iterating:**
 
+Add `%%nb_modify` to the new cell to refine further:
+
 ```python
 %%nb_modify make it iterative instead of recursive
-# [paste the improved function from the previous cell]
+def fibonacci(n: int) -> int:
+    """Calculate the nth Fibonacci number with memoization."""
+    cache = {}
+    def fib(n):
+        if n in cache: return cache[n]
+        if n <= 1: return n
+        cache[n] = fib(n-1) + fib(n-2)
+        return cache[n]
+    return fib(n)
 ```
 
 This workflow enables rapid, incremental code development entirely within the notebook.
