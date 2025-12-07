@@ -383,28 +383,86 @@ notellm stop --help
 notellm new --help
 ```
 
-## Patching cc_jupyter
+## Technical Details
 
-After running `notellm start` for the first time, run the patch script to fix known issues:
+### Automatic cc_jupyter Patches
 
-```bash
-./patch_jupyter_magic.sh
+Patches are applied automatically when running `notellm start`. The patcher (`src/patch_jupyter_magic.sh`) fixes known issues with the `claude-code-jupyter-staging` library:
+
+#### PATCH 1: Permission Error Fix
+
+**Issue:** `PermissionError` when cc_jupyter checks if `/root/code` directory exists on some systems.
+
+**Target file:** `.venv/lib/python*/site-packages/cc_jupyter/magics.py`
+
+**Fix:** Wraps `remote_dev_monorepo_root.exists()` in a try-except block to catch `PermissionError` and `OSError`.
+
+**Original code:**
+```python
+if remote_dev_monorepo_root.exists():
+    options.cwd = str(remote_dev_monorepo_root)
 ```
 
-**What it fixes:**
-- **Permission errors**: Prevents `PermissionError` when checking `/root/code` on some systems
-- **Clean output**: Removes decorative box headers from `%cc` magic-generated cells
+**Patched code:**
+```python
+try:
+    if remote_dev_monorepo_root.exists():
+        options.cwd = str(remote_dev_monorepo_root)
+except (PermissionError, OSError):
+    pass
+```
 
-**When to run:**
-- After first `notellm start` in a new project
-- After updating Python dependencies (`uv sync`)
-- If you encounter permission errors or unwanted cell decorations
+#### PATCH 2: Remove Decorative Headers
 
-The script automatically:
-- Locates your `.venv` installation
-- Creates backups before patching (`.backup` files)
-- Checks if patches are already applied (won't re-apply)
-- Can be extended with additional patches in the future
+**Issue:** `%cc` magic command generates cells with decorative ASCII box headers that clutter the notebook.
+
+**Target file:** `.venv/lib/python*/site-packages/cc_jupyter/jupyter_integration.py`
+
+**Fix:** Removes decorative header generation logic and uses original code as-is.
+
+**Original behavior:**
+```python
+# ╔════════════════════════════════════════════════════════════════════════════╗
+# ║                        CLAUDE GENERATED CELL [id: abc123]                  ║
+# ╚════════════════════════════════════════════════════════════════════════════╝
+
+# Your generated code here
+```
+
+**Patched behavior:**
+```python
+# Your generated code here (no decorative header)
+```
+
+#### Manual Patch Execution
+
+If needed, you can manually run patches:
+
+```bash
+src/patch_jupyter_magic.sh
+```
+
+The patcher:
+- Creates timestamped backups before modifying files
+- Checks if patches are already applied (idempotent)
+- Reports success/failure for each patch
+- Can be safely re-run
+
+### Cell Duplication Bug Fix
+
+**Issue:** JupyterLab's Real-Time Collaboration (RTC) feature can cause excessive cell duplication when using Claude magic commands.
+
+**Bug report:** [jupyterlab/jupyterlab#15544](https://github.com/jupyterlab/jupyterlab/issues/15544)
+
+**Fix:** notellm disables RTC by default when starting JupyterLab:
+
+```bash
+jupyter lab --YDocExtension.disable_rtc=True
+```
+
+This prevents the cell duplication issue while maintaining all other JupyterLab functionality.
+
+**Impact:** Real-time collaboration between multiple users editing the same notebook is disabled, but single-user workflows (the primary use case for notellm) are unaffected.
 
 ## Dependencies
 
