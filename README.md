@@ -8,6 +8,51 @@ A streamlined development environment for iterative notebook development combini
 
 **New workflow:** Develop iteratively within notebooks using magic commands—no external MCP server required.
 
+## Prerequisites
+
+Before installing notellm, ensure you have **Claude Code CLI** installed and working.
+
+### Installing Claude Code
+
+Claude Code is Anthropic's official CLI tool that powers the AI-assisted development features in notellm.
+
+**Quick Installation:**
+
+```bash
+# macOS, Linux, or WSL
+curl -fsSL https://claude.ai/install.sh | bash
+
+# Windows PowerShell
+irm https://claude.ai/install.ps1 | iex
+```
+
+**Alternative Installation via NPM:**
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**Verify Installation:**
+
+```bash
+claude doctor
+```
+
+**Authentication:**
+
+After installation, authenticate with your Anthropic account. You'll need:
+- Active billing at [console.anthropic.com](https://console.anthropic.com)
+- A "Claude Code" workspace will be created automatically for usage tracking
+
+**Documentation:**
+- [Official Setup Guide](https://code.claude.com/docs/en/setup) - Anthropic's Claude Code documentation
+- [Complete Installation Guide](https://dev.to/shahidkhans/from-zero-to-ai-powered-developer-your-complete-claude-code-cli-setup-guide-4l9i) - Detailed walkthrough with troubleshooting
+
+### Other Requirements
+
+- **Python 3.12+** - Required for JupyterLab and data science packages
+- **[uv](https://github.com/astral-sh/uv)** - Fast Python package manager (installed automatically if missing)
+
 ## Installation
 
 ```bash
@@ -514,12 +559,6 @@ Workspaces include these Python packages:
 | jupyterlab | Notebook interface |
 | jupyter-collaboration | Real-time collaboration support |
 | claude-code-jupyter-staging | Claude Magic Commands |
-
-## Requirements
-
-- Python 3.12+
-- [uv](https://github.com/astral-sh/uv) (installed automatically if missing)
-- [Claude Code](https://claude.ai/code) CLI
 
 ## Uninstall
 
