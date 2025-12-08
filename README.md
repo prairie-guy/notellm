@@ -383,6 +383,68 @@ notellm clean --purge     # Remove everything including dependencies
 - Never overwritten (safe to customize)
 - Template located at `~/.local/share/notellm/templates/.gitignore`
 
+#### What Remains After Clean
+
+**After `notellm clean`:**
+
+Your workspace retains its notellm configuration and is ready to restart:
+
+```
+my_project/
+├── pyproject.toml              # Python dependencies (preserved)
+├── .notellm_template.ipynb     # Notebook template (preserved)
+├── CLAUDE.md                   # Claude instructions (preserved)
+├── .claude/                    # Claude settings (preserved)
+├── .venv/                      # Virtual environment (preserved)
+├── uv.lock                     # Dependency lock (preserved)
+├── .gitignore                  # Git ignore rules (preserved)
+└── *.ipynb                     # All user notebooks (preserved)
+```
+
+**Result:** Run `notellm start` to resume work. All dependencies and configuration remain intact.
+
+---
+
+**After `notellm clean --purge`:**
+
+Your workspace is returned to a clean state with only your notebooks:
+
+```
+my_project/
+├── analysis.ipynb              # User notebooks (preserved)
+├── exploration.ipynb           # User notebooks (preserved)
+├── notebooks/                  # User directories (preserved)
+│   └── data_viz.ipynb
+└── .gitignore*                 # Preserved if marker removed
+
+* .gitignore remains only if you removed the ### NOTELLM_GITIGNORE ### marker
+```
+
+**Result:** A fresh directory with notebooks only. Run `notellm start` to recreate the notellm environment from scratch.
+
+---
+
+**Key Differences:**
+
+| Command | Use Case | What Stays |
+|---------|----------|------------|
+| `notellm clean` | Temporary cleanup, server restart issues | Everything except runtime files (.jupyter.pid, .jupyter.log, etc.) |
+| `notellm clean --purge` | Complete removal, start fresh | User notebooks only |
+
+**Common workflows:**
+
+```bash
+# Restart with clean slate (keeps all config)
+notellm stop
+notellm clean
+notellm start
+
+# Complete reset (rebuild everything)
+notellm stop
+notellm clean --purge
+notellm start                   # Rebuilds .venv, reinstalls dependencies
+```
+
 ### `notellm new`
 
 Create a new notebook with boilerplate.
