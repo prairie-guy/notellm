@@ -61,6 +61,8 @@ mkdir -p "$BIN_DIR"
 log_step "Installing files..."
 cp -r "$REPO_DIR/notellm" "$INSTALL_DIR/"
 cp -r "$REPO_DIR/templates" "$INSTALL_DIR/"
+cp -r "$REPO_DIR/lib" "$INSTALL_DIR/"
+cp -r "$REPO_DIR/src" "$INSTALL_DIR/"
 
 chmod +x "$INSTALL_DIR/notellm"
 

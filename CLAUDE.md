@@ -66,8 +66,8 @@ When using `%cc` commands, Claude Code has access to:
 
 Add to notebook (usually in first cell):
 ```python
-sys.path.append("..")
-%load_ext src.cc_notebook_helpers
+sys.path.append(f"{Path.home()}/.local/share/notellm/lib")
+%load_ext cc_notebook_helpers
 ```
 
 ### Cell Organization Commands

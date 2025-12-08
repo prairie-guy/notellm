@@ -9,12 +9,13 @@
 ## Directory Structure
 
 ```
-├── notebooks/          # Jupyter notebooks
-├── data/              # Data files
-├── src/               # Python modules (including notebook helpers)
-├── figures/           # Saved visualizations
-└── .claude/           # Claude Code settings
+├── .notellm_template.ipynb    # Notebook template (hidden)
+└── .claude/                   # Claude Code settings
 ```
+
+**Note:** All notellm utilities (`cc_notebook_helpers.py`, `notebook_utils.py`, `patch_jupyter_magic.sh`) are installed globally in `~/.local/share/notellm/lib/` and shared across all projects.
+
+Users organize notebooks and directories however they prefer. Use `notellm new path/file` to create notebooks with custom directory structure.
 
 ## Jupyter Notebook Workflow
 
@@ -25,14 +26,16 @@ These patches fix permission errors and remove decorative headers.
 
 ### In-Notebook Magic Commands
 
-**cc_jupyter** - `%cc` and `%%cc` magic commands for Claude interactions
-
-Load in notebook:
+Load all notellm magic commands in your first notebook cell:
 ```python
-%load_ext cc_jupyter
+%load_ext notellm_magic
 ```
 
-Usage:
+This loads:
+- `cc_jupyter` - `%cc` and `%%cc` magic commands for Claude interactions
+- `cc_notebook_helpers` - Notebook cell utilities (`%%nb_modify`, `%nb_list`, etc.)
+
+**Using %cc magic:**
 - `%cc <prompt>` - Single-line prompt, creates new code cell with result
 - `%%cc <prompt>` - Multi-line prompt with code context in cell body
 
@@ -61,14 +64,6 @@ When using `%cc` commands, Claude Code has access to:
 **Note:** This setup does NOT use the external Jupyter MCP server. All operations are streamlined through cc_jupyter and built-in tools.
 
 ## Notebook Helper Tools
-
-### Loading Helpers
-
-Add to notebook (usually in first cell):
-```python
-sys.path.append("..")
-%load_ext src.cc_notebook_helpers
-```
 
 ### Cell Organization Commands
 

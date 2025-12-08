@@ -82,12 +82,7 @@ notellm new exploration
 In your first notebook cell:
 
 ```python
-# Load Claude Code magic
-%load_ext cc_jupyter
-
-# Load notebook helpers for iterative development
-sys.path.append("..")
-%load_ext src.cc_notebook_helpers
+%load_ext notellm_magic
 ```
 
 ### 6. Iterative Development Workflow
@@ -321,8 +316,9 @@ notellm start --foreground         # Run in foreground (Ctrl+C to stop)
 - `CLAUDE.md` — Instructions for Claude Code
 - `.claude/settings.json` — Claude Code permissions
 - `.env.jupyter` — Port and token config
-- `src/` — Notebook helper utilities and patcher
-- `notebooks/`, `data/`, `figures/` directories
+- `.notellm_template.ipynb` — Customizable notebook template
+
+**Note:** All notellm utilities are installed globally in `~/.local/share/notellm/lib/` (shared across all projects).
 
 ### `notellm stop`
 
@@ -363,41 +359,58 @@ notellm clean --purge     # Remove everything including dependencies
 ```
 
 **Default behavior:**
-- Removes: `.env.jupyter`, `.jupyter.pid`, `.jupyter.log`
+- Removes: `.env.jupyter`, `.jupyter.pid`, `.jupyter.log`, `.mcp.json`, `.ipynb_checkpoints/`
 - Refuses to clean if server is running (run `notellm stop` first)
-- Preserves all user files and directories
+- Preserves: `pyproject.toml`, `.notellm_template.ipynb`, all user notebooks
 
 **With --purge:**
-- Also removes: `.venv/`, `uv.lock`, `CLAUDE.md`, `.jupyter_ystore.db`, and any other `.jupyter*` files
+- Removes everything: `.venv/`, `uv.lock`, `CLAUDE.md`, `.claude/`, `.jupyter*` files,
+  `pyproject.toml`, `.notellm_template.ipynb`
+- Removes `.gitignore` **only if** it contains the `### NOTELLM_GITIGNORE ###` marker
+- Cleans uv cache for patched packages
 - Requires confirmation before proceeding
-- Use when you want to completely reset the workspace
+- Use when you want to completely remove notellm from a project
 
-**Always preserved:**
-- **`pyproject.toml`** - User may have customized dependencies (e.g., changed JupyterLab version)
-- User directories: `notebooks/`, `data/`, `src/`, `figures/`
-- Jupyter notebooks: All `*.ipynb` files
-- Any other user-created files
+**Always preserved (even with --purge):**
+- All user notebooks: `*.ipynb` files (except `.notellm_template.ipynb`)
+- `.gitignore` without the notellm marker (user-created or customized)
+- Any other user-created files and directories
+
+**About `.gitignore`:**
+- Created on first `notellm start` if doesn't exist
+- Contains `### NOTELLM_GITIGNORE ###` marker at top
+- Remove marker to prevent deletion by `--purge`
+- Never overwritten (safe to customize)
+- Template located at `~/.local/share/notellm/templates/.gitignore`
 
 ### `notellm new`
 
 Create a new notebook with boilerplate.
 
 ```bash
-notellm new my_analysis              # notebooks/my_analysis.ipynb
-notellm new exploration --dir .      # ./exploration.ipynb
-notellm new data_viz --open          # Create and open in browser
+notellm new analysis                    # ./analysis.ipynb (current directory)
+notellm new notebooks/my_analysis       # notebooks/my_analysis.ipynb (creates dir if needed)
+notellm new data/exploration --open     # data/exploration.ipynb and open in browser
 ```
+
+**Path handling:**
+- Simple filename: Creates in current directory
+- `path/filename`: Creates in path (creates directory if doesn't exist)
+- Must be relative paths within current directory (no `..` or absolute paths)
+- Can overwrite existing files
+- Never deletes directories
+
+**Why the restriction?** JupyterLab server runs with `--notebook-dir=.` and only has access to the current directory and subdirectories.
 
 **Template customization:**
 
-Notebooks are created from `src/template.ipynb`. Customize this template to change the default notebook structure.
+Notebooks are created from `.notellm_template.ipynb` (hidden file in project root). Customize this template to change the default notebook structure.
 
 **Default template includes:**
 - Title (derived from filename) and date
 - Imports: polars, pandas, numpy, altair, matplotlib, seaborn
 - Configuration: pandas, polars, matplotlib settings
-- Paths: DATA_DIR, FIGURES_DIR
-- Magic commands: `%load_ext cc_jupyter` and notebook helpers
+- Magic commands: `%load_ext notellm_magic`
 
 ### `notellm update`
 

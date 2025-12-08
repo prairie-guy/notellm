@@ -15,9 +15,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo "cc_jupyter Modular Patcher v${VERSION}"
-echo "======================================="
-echo ""
+# Silent mode - only show output on first run or errors
 
 # Find cc_jupyter installation
 find_cc_jupyter() {
@@ -33,20 +31,17 @@ patch_permission_error() {
     local cc_jupyter_path="$1"
     local magics_file="$cc_jupyter_path/magics.py"
 
-    echo -e "${BLUE}[PATCH 1]${NC} Permission Error Fix"
-
     if [ ! -f "$magics_file" ]; then
-        echo -e "${RED}  ✗ SKIP${NC} - magics.py not found"
+        echo -e "${RED}[PATCH 1] SKIP - magics.py not found${NC}"
         return 1
     fi
 
     # Check if already patched
     if grep -q "except (PermissionError, OSError):" "$magics_file"; then
-        echo -e "${GREEN}  ✓ SKIP${NC} - Already applied"
-        return 0
+        return 0  # Already applied, silent
     fi
 
-    echo -e "${YELLOW}  → Applying...${NC}"
+    echo "[PATCH 1] Applying Permission Error Fix..."
 
     # Create backup
     cp "$magics_file" "${magics_file}.backup.$(date +%Y%m%d_%H%M%S)"
@@ -97,10 +92,10 @@ else:
 PYTHON_SCRIPT
 
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}  ✓ SUCCESS${NC}"
+        echo -e "${GREEN}✓ Applied${NC}"
         return 0
     else
-        echo -e "${RED}  ✗ FAILED${NC} - Could not find target code"
+        echo -e "${RED}✗ FAILED - Could not find target code${NC}"
         return 1
     fi
 }
@@ -112,20 +107,17 @@ patch_decorative_headers() {
     local cc_jupyter_path="$1"
     local jupyter_integration_file="$cc_jupyter_path/jupyter_integration.py"
 
-    echo -e "${BLUE}[PATCH 2]${NC} Remove Decorative Headers"
-
     if [ ! -f "$jupyter_integration_file" ]; then
-        echo -e "${RED}  ✗ SKIP${NC} - jupyter_integration.py not found"
+        echo -e "${RED}[PATCH 2] SKIP - jupyter_integration.py not found${NC}"
         return 1
     fi
 
     # Check if already patched
     if grep -q "# No decorative header - use original code as-is" "$jupyter_integration_file"; then
-        echo -e "${GREEN}  ✓ SKIP${NC} - Already applied"
-        return 0
+        return 0  # Already applied, silent
     fi
 
-    echo -e "${YELLOW}  → Applying...${NC}"
+    echo "[PATCH 2] Removing Decorative Headers..."
 
     # Create backup
     cp "$jupyter_integration_file" "${jupyter_integration_file}.backup.$(date +%Y%m%d_%H%M%S)"
@@ -183,10 +175,10 @@ else:
 PYTHON_SCRIPT
 
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}  ✓ SUCCESS${NC}"
+        echo -e "${GREEN}✓ Applied${NC}"
         return 0
     else
-        echo -e "${RED}  ✗ FAILED${NC} - Could not find target code"
+        echo -e "${RED}✗ FAILED - Could not find target code${NC}"
         return 1
     fi
 }
@@ -208,8 +200,7 @@ if [ -z "$CC_JUPYTER_PATH" ]; then
     exit 1
 fi
 
-echo -e "${GREEN}Found cc_jupyter:${NC} $CC_JUPYTER_PATH"
-echo ""
+# Found cc_jupyter (silent unless error)
 
 # Array of patch functions to run
 PATCH_FUNCTIONS=(
@@ -226,38 +217,21 @@ PATCHES_SKIPPED=0
 PATCHES_FAILED=0
 
 for patch_func in "${PATCH_FUNCTIONS[@]}"; do
-    if $patch_func "$CC_JUPYTER_PATH"; then
-        # Check if it was skipped (already applied) or newly applied
-        if grep -q "SKIP" <<< "$($patch_func "$CC_JUPYTER_PATH" 2>&1 | head -1)"; then
-            ((PATCHES_SKIPPED++)) || true
-        else
-            ((PATCHES_APPLIED++)) || true
-        fi
+    $patch_func "$CC_JUPYTER_PATH"
+    result=$?
+    if [ $result -eq 0 ]; then
+        ((PATCHES_APPLIED++)) || true
     else
         ((PATCHES_FAILED++)) || true
     fi
-    echo ""
 done
 
-# Summary
-echo "======================================="
+# Only show summary if patches were applied or failed
 if [ $PATCHES_APPLIED -gt 0 ]; then
-    echo -e "${GREEN}✓ $PATCHES_APPLIED patch(es) applied${NC}"
-fi
-if [ $PATCHES_SKIPPED -gt 0 ]; then
-    echo -e "${YELLOW}→ $PATCHES_SKIPPED patch(es) skipped (already applied)${NC}"
-fi
-if [ $PATCHES_FAILED -gt 0 ]; then
-    echo -e "${RED}✗ $PATCHES_FAILED patch(es) failed${NC}"
-fi
-echo ""
-
-if [ $PATCHES_FAILED -eq 0 ]; then
-    echo "Ready to use! Test in Jupyter:"
-    echo "  %load_ext cc_jupyter"
-    echo "  %cc write factorial function"
-    exit 0
-else
-    echo -e "${RED}Some patches failed. Check output above.${NC}"
+    echo -e "${GREEN}✓ cc_jupyter patches applied${NC}"
+elif [ $PATCHES_FAILED -gt 0 ]; then
+    echo -e "${RED}✗ Patch application failed${NC}"
     exit 1
 fi
+
+exit 0

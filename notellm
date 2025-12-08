@@ -143,10 +143,9 @@ ${YELLOW}STOP OPTIONS:${NC}
     -p, --port PORT     Stop all processes on specific port
 
 ${YELLOW}CLEAN OPTIONS:${NC}
-    --purge             Also remove .venv, uv.lock, CLAUDE.md (preserves pyproject.toml)
+    --purge             Remove all notellm files including pyproject.toml and .notellm_template.ipynb
 
 ${YELLOW}NEW OPTIONS:${NC}
-    -d, --dir DIR       Directory for notebook (default: notebooks/)
     -o, --open          Open in browser after creation
 
 ${YELLOW}EXAMPLES:${NC}
@@ -158,8 +157,9 @@ ${YELLOW}EXAMPLES:${NC}
     notellm stop -p 8888            # Stop all processes on port 8888
     notellm clean                   # Remove config files
     notellm clean --purge           # Remove config + dependencies
-    notellm new my_analysis         # Create notebooks/my_analysis.ipynb
-    notellm test                    # Copy test suite for manual execution
+    notellm new analysis            # Create analysis.ipynb in current directory
+    notellm new notebooks/my_nb     # Create notebooks/my_nb.ipynb (creates dir if needed)
+    notellm test                    # Copy TestSuite.ipynb to current directory
 
 ${YELLOW}WORKFLOW:${NC}
     1. cd ~/my-project
@@ -312,61 +312,24 @@ EOF
     cp "$INSTALL_DIR/templates/settings.json" .claude/settings.local.json
     log_info "Created .claude/settings.json and .claude/settings.local.json"
 
-    # Create directory structure
-    log_step "Creating directories..."
-    mkdir -p notebooks data figures
-    log_info "Created notebooks/, data/, figures/"
-
-    # Copy src/ directory with notebook helpers
-    log_step "Copying notebook helpers..."
-    if [ -d "$INSTALL_DIR/templates/src" ]; then
-        cp -r "$INSTALL_DIR/templates/src" .
-        chmod +x src/patch_jupyter_magic.sh 2>/dev/null || true
-        log_info "Copied src/ with notebook helper utilities and patcher"
-    else
-        # Fallback to creating empty src/ if templates don't have it
-        mkdir -p src
-        log_info "Created empty src/"
+    # Copy notebook template to root as hidden file
+    log_step "Copying notebook template..."
+    if [ -f "$INSTALL_DIR/templates/.notellm_template.ipynb" ]; then
+        cp "$INSTALL_DIR/templates/.notellm_template.ipynb" .notellm_template.ipynb
+        log_info "Copied notebook template (customize: .notellm_template.ipynb)"
     fi
 
-    # Copy notebook template
-    if [ -f "$INSTALL_DIR/templates/template.ipynb" ]; then
-        cp "$INSTALL_DIR/templates/template.ipynb" src/template.ipynb
-        log_info "Copied notebook template (customize: src/template.ipynb)"
-    fi
-
-    # Create .gitignore
+    # Create .gitignore (only if doesn't exist - never overwrite)
     if [ ! -f .gitignore ]; then
         log_step "Creating .gitignore..."
-        cat > .gitignore << 'EOF'
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-.env
-.env.jupyter
-
-# Jupyter
-.ipynb_checkpoints/
-*.ipynb_checkpoints/
-.jupyter.pid
-.jupyter.log
-
-# Patch backups
-*.backup
-
-# Claude Code
-.claude/settings.local.json
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-EOF
-        log_info "Created .gitignore"
+        if [ -f "$INSTALL_DIR/templates/.gitignore" ]; then
+            cp "$INSTALL_DIR/templates/.gitignore" .gitignore
+            log_info "Created .gitignore (marked for removal with clean --purge)"
+        else
+            log_warn ".gitignore template not found at $INSTALL_DIR/templates/"
+        fi
+    else
+        log_info "Using existing .gitignore"
     fi
     
     # Install dependencies
@@ -471,7 +434,31 @@ EOF
 
     # Load config (now guaranteed to exist)
     source "$CONFIG_FILE"
-    
+
+    # Install/update notellm_magic extension into .venv
+    log_info "Installing notellm_magic extension..."
+    PYTHON_VERSION=$(uv run python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+    if [ -n "$PYTHON_VERSION" ]; then
+        SITE_PACKAGES=".venv/lib/python${PYTHON_VERSION}/site-packages"
+
+        if [ -d "$SITE_PACKAGES" ]; then
+            # Remove old version if exists
+            [ -d "$SITE_PACKAGES/notellm_magic" ] && rm -rf "$SITE_PACKAGES/notellm_magic"
+
+            # Copy new version
+            if [ -d "$INSTALL_DIR/src/notellm_magic" ]; then
+                cp -r "$INSTALL_DIR/src/notellm_magic" "$SITE_PACKAGES/notellm_magic"
+                log_info "notellm_magic extension installed"
+            else
+                log_warn "notellm_magic source not found in $INSTALL_DIR/src/"
+            fi
+        else
+            log_warn "Could not find site-packages directory: $SITE_PACKAGES"
+        fi
+    else
+        log_warn "Could not detect Python version for extension install"
+    fi
+
     banner "Starting JupyterLab"
     
     # Check if already running
@@ -562,8 +549,8 @@ EOF
 
         # Apply cc_jupyter patches
         echo -e "${BLUE}Applying cc_jupyter patches...${NC}"
-        if [ -f "src/patch_jupyter_magic.sh" ]; then
-            if src/patch_jupyter_magic.sh 2>&1 | tee -a "$LOG_FILE"; then
+        if [ -f "$INSTALL_DIR/lib/patch_jupyter_magic.sh" ]; then
+            if "$INSTALL_DIR/lib/patch_jupyter_magic.sh" 2>&1 | tee -a "$LOG_FILE"; then
                 echo ""
             else
                 PATCH_EXIT=$?
@@ -582,7 +569,7 @@ EOF
                     echo "Check output above for details."
                     echo ""
                     echo "To retry manually:"
-                    echo "  src/patch_jupyter_magic.sh"
+                    echo "  $INSTALL_DIR/lib/patch_jupyter_magic.sh"
                     echo ""
                     echo -e "${RED}Stopping server due to patch failure...${NC}"
                     kill $(cat "$PID_FILE") 2>/dev/null || true
@@ -591,7 +578,7 @@ EOF
                 fi
             fi
         else
-            echo -e "${YELLOW}No src/patch_jupyter_magic.sh found (skipping)${NC}"
+            echo -e "${YELLOW}Patcher not found at $INSTALL_DIR/lib/ (skipping)${NC}"
             echo ""
         fi
     fi
@@ -804,19 +791,22 @@ ${YELLOW}USAGE:${NC}
     notellm clean [options]
 
 ${YELLOW}OPTIONS:${NC}
-    --purge     Also remove .venv, uv.lock, CLAUDE.md, .claude/, src/, .jupyter*, and uv cache
+    --purge     Remove all notellm files including user config (pyproject.toml, .notellm_template.ipynb)
     -h, --help  Show this help
 
 ${YELLOW}BEHAVIOR:${NC}
-    Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log
-    --purge: Also removes .venv/, uv.lock, CLAUDE.md, .claude/, src/,
-             .jupyter_ystore.db, and cleans uv cache for patched packages (claude-code-jupyter-staging)
+    Default: Removes .env.jupyter, .mcp.json, .jupyter.pid, .jupyter.log, .ipynb_checkpoints/
+             Preserves: pyproject.toml, .notellm_template.ipynb, user notebooks
 
-    User files are always preserved: notebooks/, data/, figures/, *.ipynb, pyproject.toml
+    --purge: Removes everything including .venv/, uv.lock, CLAUDE.md, .claude/,
+             pyproject.toml, .notellm_template.ipynb, .gitignore (if marked), and cleans uv cache
+             Preserves: User notebooks (*.ipynb except .notellm_template.ipynb)
+
+    Note: .gitignore is only removed if it contains "### NOTELLM_GITIGNORE ###" marker
 
 ${YELLOW}EXAMPLES:${NC}
-    notellm clean           # Remove config files only
-    notellm clean --purge   # Remove everything (requires confirmation)
+    notellm clean           # Remove config files, keep user customizations
+    notellm clean --purge   # Remove everything except user notebooks
 
 EOF
                 exit 0
@@ -846,13 +836,31 @@ EOF
     [ -f "$PID_FILE" ] && files_to_remove+=("$PID_FILE")
     [ -f "$LOG_FILE" ] && files_to_remove+=("$LOG_FILE")
 
+    # Remove Jupyter checkpoint directories (auto-generated, safe to delete)
+    if [ -d ".ipynb_checkpoints" ]; then
+        files_to_remove+=(".ipynb_checkpoints/")
+    fi
+    # Also remove nested checkpoint directories
+    for dir in */.ipynb_checkpoints; do
+        if [ -d "$dir" ]; then
+            files_to_remove+=("$dir/")
+        fi
+    done
+
     if [ "$purge" = true ]; then
         [ -d ".venv" ] && files_to_remove+=(".venv/")
         [ -f "uv.lock" ] && files_to_remove+=("uv.lock")
-        # pyproject.toml is preserved (user may have customized dependencies)
         [ -f "CLAUDE.md" ] && files_to_remove+=("CLAUDE.md")
         [ -d ".claude" ] && files_to_remove+=(".claude/")
-        [ -d "src" ] && files_to_remove+=("src/")
+
+        # User configuration files (only removed with --purge)
+        [ -f "pyproject.toml" ] && files_to_remove+=("pyproject.toml")
+        [ -f ".notellm_template.ipynb" ] && files_to_remove+=(".notellm_template.ipynb")
+
+        # .gitignore (only if it has notellm marker)
+        if [ -f ".gitignore" ] && grep -q "^### NOTELLM_GITIGNORE ###$" .gitignore; then
+            files_to_remove+=(".gitignore")
+        fi
 
         # Add all .jupyter* files and directories (except .jupyter.pid and .jupyter.log which are already included)
         for item in .jupyter*; do
@@ -880,7 +888,15 @@ EOF
 
     # Confirmation for purge
     if [ "$purge" = true ]; then
-        echo -e "${YELLOW}Warning:${NC} --purge will remove dependencies (requires re-download)"
+        echo -e "${YELLOW}Warning:${NC} --purge will remove all notellm files including:"
+        echo "  • Dependencies (.venv/, uv.lock)"
+        echo "  • User config (pyproject.toml, .notellm_template.ipynb)"
+        if [ -f ".gitignore" ] && grep -q "^### NOTELLM_GITIGNORE ###$" .gitignore; then
+            echo "  • .gitignore (contains notellm marker)"
+        fi
+        echo ""
+        echo "User notebooks (*.ipynb) will be preserved."
+        echo ""
         echo -n "Continue? (y/N): "
         read -r response
         if [[ ! "$response" =~ ^[Yy]$ ]]; then
@@ -914,7 +930,11 @@ EOF
     echo ""
     log_info "Workspace cleaned"
     echo ""
-    echo "User files preserved: notebooks/, data/, figures/, *.ipynb, pyproject.toml"
+    if [ "$purge" = true ]; then
+        echo "All notellm files removed. User notebooks (*.ipynb) preserved."
+    else
+        echo "Config files removed. User files preserved: *.ipynb, pyproject.toml, .notellm_template.ipynb"
+    fi
     echo "To reinitialize: notellm start"
     echo ""
 }
@@ -925,15 +945,10 @@ EOF
 
 cmd_new() {
     local notebook_name=""
-    local notebook_dir="$NOTEBOOKS_DIR"
     local open_browser=false
-    
+
     while [[ $# -gt 0 ]]; do
         case $1 in
-            -d|--dir)
-                notebook_dir="$2"
-                shift 2
-                ;;
             -o|--open)
                 open_browser=true
                 shift
@@ -943,26 +958,31 @@ cmd_new() {
 ${BOLD}notellm new${NC} - Create new notebook
 
 ${YELLOW}USAGE:${NC}
-    notellm new <name> [options]
+    notellm new <name|path/name> [options]
 
 ${YELLOW}ARGUMENTS:${NC}
-    name                Notebook name (extension ignored/replaced)
+    name                Simple filename (created in current directory)
+    path/name           File with path (creates path if doesn't exist)
 
 ${YELLOW}OPTIONS:${NC}
-    -d, --dir DIR       Directory (default: notebooks/)
     -o, --open          Open in browser after creation
     -h, --help          Show this help
 
 ${YELLOW}EXAMPLES:${NC}
-    notellm new my_analysis           # notebooks/my_analysis.ipynb
-    notellm new exploration -d .      # ./exploration.ipynb
-    notellm new data_viz --open       # Create and open in browser
+    notellm new analysis                    # ./analysis.ipynb
+    notellm new notebooks/my_analysis       # notebooks/my_analysis.ipynb (creates notebooks/ if needed)
+    notellm new data/exploration --open     # data/exploration.ipynb and open in browser
+
+${YELLOW}NOTES:${NC}
+    - Extension (.ipynb) is optional and will be added automatically
+    - Creates directories as needed (never deletes existing paths)
+    - Can overwrite existing files
+    - Paths must be relative and within current directory (no .. or absolute paths)
 
 ${YELLOW}NOTEBOOK TEMPLATE:${NC}
-    - Based on src/template.ipynb (customize to change defaults)
+    - Based on .notellm_template.ipynb (customize to change defaults)
     - Imports: polars, pandas, numpy, altair, matplotlib, seaborn
     - Configuration: pandas, polars, matplotlib settings
-    - Paths: DATA_DIR, FIGURES_DIR
     - Magic commands: %cc (Claude) and notebook helpers
 
 EOF
@@ -983,35 +1003,70 @@ EOF
                 ;;
         esac
     done
-    
+
     if [ -z "$notebook_name" ]; then
         log_error "Notebook name required"
         echo ""
-        echo "Usage: notellm new <name>"
+        echo "Usage: notellm new <name|path/name>"
         echo "       notellm new --help"
         exit 1
     fi
-    
-    # Clean notebook name
-    local base=$(basename "$notebook_name" .ipynb)
-    base=$(basename "$base" .py)
-    base=$(echo "$base" | sed 's/[^a-zA-Z0-9_-]/_/g')
-    
-    mkdir -p "$notebook_dir"
-    local path="${notebook_dir}/${base}.ipynb"
-    
-    if [ -f "$path" ]; then
-        log_error "Notebook already exists: $path"
+
+    # Parse path and filename
+    local notebook_dir
+    local filename
+
+    if [[ "$notebook_name" == */* ]]; then
+        # Contains path separator
+        notebook_dir=$(dirname "$notebook_name")
+        filename=$(basename "$notebook_name")
+    else
+        # Simple filename - use current directory
+        notebook_dir="."
+        filename="$notebook_name"
+    fi
+
+    # Validate path is within server scope
+    if [[ "$notebook_name" == /* ]]; then
+        log_error "Absolute paths are not allowed"
+        echo ""
+        echo "JupyterLab server only has access to the current directory and subdirectories."
+        echo "Use a relative path instead: notellm new notebooks/myfile"
         exit 1
     fi
-    
-    local title=$(name_to_title "$base")
+
+    if [[ "$notebook_name" == ../* ]] || [[ "$notebook_name" == */../* ]]; then
+        log_error "Paths outside the current directory are not allowed"
+        echo ""
+        echo "JupyterLab server only has access to the current directory and subdirectories."
+        echo "Cannot create notebooks using '..' to go up directories."
+        echo ""
+        echo "Examples of valid paths:"
+        echo "  notellm new analysis           # ./analysis.ipynb"
+        echo "  notellm new notebooks/work     # ./notebooks/work.ipynb"
+        exit 1
+    fi
+
+    # Clean filename
+    filename=$(basename "$filename" .ipynb)
+    filename=$(basename "$filename" .py)
+    filename=$(echo "$filename" | sed 's/[^a-zA-Z0-9_-]/_/g')
+
+    # Create directory if it doesn't exist
+    if [ "$notebook_dir" != "." ] && [ ! -d "$notebook_dir" ]; then
+        mkdir -p "$notebook_dir"
+        log_info "Created directory: $notebook_dir"
+    fi
+
+    local path="${notebook_dir}/${filename}.ipynb"
+
+    local title=$(name_to_title "$filename")
     local today=$(date '+%Y-%m-%d')
 
     banner "Creating notebook"
 
     # Use template if available
-    local template_file="src/template.ipynb"
+    local template_file=".notellm_template.ipynb"
     if [ -f "$template_file" ]; then
         # Copy template and replace placeholders
         sed -e "s/{{TITLE}}/$title/g" \
@@ -1158,7 +1213,7 @@ EOF
     fi
 
     log_info "Created: $path"
-    log_info "Customize default template: src/template.ipynb"
+    log_info "Customize default template: .notellm_template.ipynb"
     
     echo ""
     echo -e "${YELLOW}Contents:${NC}"
@@ -1213,8 +1268,8 @@ EOF
 cmd_test() {
     banner "notellm Test Suite"
 
-    # Copy template
-    local dest="$NOTEBOOKS_DIR/TestSuite.ipynb"
+    # Copy template to current directory
+    local dest="TestSuite.ipynb"
 
     if [ ! -d "$INSTALL_DIR/templates" ]; then
         log_error "Templates not found at $INSTALL_DIR/templates"
@@ -1228,7 +1283,6 @@ cmd_test() {
         exit 1
     fi
 
-    mkdir -p "$NOTEBOOKS_DIR"
     cp "$INSTALL_DIR/templates/TestSuite.ipynb" "$dest"
 
     echo ""
@@ -1246,7 +1300,7 @@ cmd_test() {
         echo "  1. Start server: notellm start"
     fi
 
-    echo "  2. Navigate to notebooks/TestSuite.ipynb"
+    echo "  2. Open TestSuite.ipynb"
     echo "  3. Execute cells sequentially"
     echo "  4. Review test results at the end of the notebook"
     echo ""
