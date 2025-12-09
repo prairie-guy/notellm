@@ -1,0 +1,52 @@
+### NOTELLM_MANIFEST ###
+# notellm Managed Files Manifest
+# This file defines all files/patterns created and managed by notellm
+# Used by: 'notellm clean --purge' and .gitignore generation
+#
+# Format: Standard .gitignore syntax
+# - Patterns are evaluated as shell globs
+# - Lines starting with # are comments
+# - Empty lines are ignored
+
+# Python environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# Jupyter runtime files
+.env.jupyter
+.jupyter.pid
+.jupyter.log
+.jupyter*/
+
+# Jupyter checkpoints (auto-generated)
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# notellm configuration files
+CLAUDE.md
+.claude/
+.notellm_template.ipynb
+pyproject.toml
+uv.lock
+
+# MCP configuration
+.mcp.json
+
+# Patch backups
+*.backup
+
+# Test files
+TestSuite.ipynb
+
+# Local overrides (not tracked in git)
+.claude/settings.local.json
+.env
+
+# IDE directories
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
