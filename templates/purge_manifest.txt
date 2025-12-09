@@ -9,23 +9,23 @@
 # - Empty lines are ignored
 
 # Python environment
-.venv/
-__pycache__/
+.venv
+__pycache__
 *.py[cod]
 
 # Jupyter runtime files
 .env.jupyter
 .jupyter.pid
 .jupyter.log
-.jupyter*/
+.jupyter*
 
 # Jupyter checkpoints (auto-generated)
-.ipynb_checkpoints/
-*.ipynb_checkpoints/
+.ipynb_checkpoints
+*.ipynb_checkpoints
 
 # notellm configuration files
 CLAUDE.md
-.claude/
+.claude
 .notellm_template.ipynb
 pyproject.toml
 uv.lock
@@ -44,8 +44,8 @@ TestSuite.ipynb
 .env
 
 # IDE directories
-.vscode/
-.idea/
+.vscode
+.idea
 
 # OS files
 .DS_Store

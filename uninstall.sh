@@ -100,7 +100,4 @@ if [ "$QUIET" = false ]; then
     echo ""
     echo "notellm has been removed."
     echo ""
-    echo "Project files created with 'notellm init' were not removed."
-    echo "You can delete those manually if desired."
-    echo ""
 fi

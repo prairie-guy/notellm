@@ -21,8 +21,8 @@ dependencies = [
     "jupyter-collaboration>=3.0",
     "ipykernel>=6.29",
     
-    # Claude Code Jupyter magic
-    "claude-code-jupyter-staging>=0.0.1",
+    # Claude Code Jupyter magic (pinned - archived in lib/vendor/)
+    "claude-code-jupyter-staging==0.0.1",
 ]
 
 [tool.uv]

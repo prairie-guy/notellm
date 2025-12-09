@@ -565,6 +565,14 @@ Workspaces include these Python packages:
 | jupyter-collaboration | Real-time collaboration support |
 | claude-code-jupyter-staging | Claude Magic Commands |
 
+**Note on claude-code-jupyter-staging:** Version 0.0.1 is pinned in `pyproject.toml` and archived in `lib/vendor/` as the package is under active development. If future versions introduce breaking changes or the package becomes unavailable, install from the archived wheel:
+
+```bash
+uv pip install lib/vendor/claude_code_jupyter_staging-0.0.1-py3-none-any.whl
+```
+
+See `lib/vendor/README.md` for details.
+
 ## Uninstall
 
 ```bash
