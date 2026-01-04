@@ -8,12 +8,15 @@ Fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyt
 
 ### Prerequisites
 
-Install dependencies in your Python environment:
+1. Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code):
+```bash
+npm install -g @anthropic-ai/claude-code
+```
 
+2. Install Python dependencies in your environment:
 ```bash
 pip install trio claude-code-sdk
 ```
-
 (tested with trio==0.24.0, claude-code-sdk==0.1.0)
 
 ### Install notellm_magic
@@ -36,17 +39,64 @@ In a Jupyter notebook:
 
 ```python
 %load_ext notellm_magic
+```
 
+On successful load, you'll see:
+
+```
+Claude Code Magic loaded!
+Features:
+  • Full agentic Claude Code execution
+  • Cell-based code approval workflow
+  • Real-time message streaming
+  • Session state preservation
+  • Conversation continuity across cells
+```
+
+### Basic Usage
+
+```python
+%cc Create a hello world script
+```
+
+Or multi-line:
+
+```python
 %%cc
-Create a hello world script
+Create a function that calculates fibonacci numbers
+Use memoization for efficiency
 ```
 
 ### Magic Commands
 
-- `%cc <prompt>` - Single-line prompt
-- `%%cc` - Multi-line prompt (cell magic)
-- `%cc_new <prompt>` - Start fresh conversation (no history)
-- `%ccn <prompt>` - Alias for `%cc_new`
+**Basic:**
+- `%cc <instructions>` - Continue conversation (one-line)
+- `%%cc <instructions>` - Continue conversation (multi-line)
+- `%cc_new` (or `%ccn`) - Start fresh conversation
+- `%cc --help` - Show all options
+
+**Context management:**
+- `%cc --import <file>` - Add file to conversation context
+- `%cc --add-dir <dir>` - Add directory to Claude's accessible directories
+- `%cc --mcp-config <file>` - Set path to MCP server config
+- `%cc --cells-to-load <num>` - Number of cells to load into new conversation
+
+**Output:**
+- `%cc --model <name>` - Model to use (default: sonnet)
+- `%cc --max-cells <num>` - Max cells Claude can create per turn (default: 3)
+
+**Display:**
+- `%cc --clean` - Replace prompt cells with Claude's code cells
+- `%cc --no-clean` - Keep prompt cells (default)
+
+### When to use each form
+
+- **`%cc`** (single %) - Short, one-line instructions
+- **`%%cc`** (double %) - Multi-line instructions or detailed prompts
+
+### Notes
+
+- Restart the kernel to stop the Claude session
 
 ## Project Structure
 
