@@ -2,17 +2,19 @@
 
 **Lightweight Jupyter magic extension for Claude Code integration.**
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. notellm is a fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyter-staging/), a development version from Anthropic, adapted for my workflow.
-
-[Jupyter AI](https://jupyter-ai.readthedocs.io/) is a great tool, but I prefer developing code iteratively from within notebook cells. With notellm, Claude works *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells. The `%cc` cells act as scaffolding that I typically remove once the code is working:
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. notellm provides the `%cc` magic command that lets Claude work *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells:
 
 ```python
-%cc Load the penguins dataset using Altair 6.0 syntax, convert to Polars
+%cc Load the penguins dataset searching for the most recent Altair 6.0 syntax, convert to Polars
 ```
 
-Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session.
+Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session. The `%cc` cells act as scaffolding that I typically remove once the code is working.
+
+This differs from sidebar-based approaches where you chat with an LLM separately and copy/paste results. With notellm, code development happens iteratively from within notebook cells.
 
 I work in bioinformatics and developed notellm for myself, but hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
+
+notellm is adapted from a development version released by Anthropic. Any issues are my own.
 
 **Key features:**
 - Full agentic Claude Code execution within notebook cells
@@ -21,16 +23,14 @@ I work in bioinformatics and developed notellm for myself, but hopefully it's us
 - Conversation continuity across cells
 - Automatic permissions setup for common operations
 
-**See also:** [Vizard](https://github.com/prairie-guy/vizard) — a domain-specific language I developed for data visualization using the same Claude Code Jupyter integration. Example:
+**See also:** [Vizard](https://github.com/prairie-guy/vizard) — a stateful declarative language for LLM-driven Python visualization code combining structured keywords with natural language. It includes a large `CLAUDE.md` file optimized for use with Polars and Altair. Example:
 
 ```python
 %%cc
 DATA penguins.csv FILTER species == "Adelie" || PLOT violin Y body_mass_g COLOR sex
 ```
 
-Vizard combines CAPITALIZED keywords with natural language to create Altair and Matplotlib visualizations with Polars dataframes.
-
-## Demo
+## Example Session
 
 ![notellm demo](docs/demo.png)
 
