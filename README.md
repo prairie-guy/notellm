@@ -6,7 +6,7 @@ Fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyt
 
 ## Demo
 
-[View demo notebook](https://nbviewer.org/github/prairie-guy/notellm/blob/main/docs/demo.ipynb)
+[View demo notebook](docs/demo.ipynb)
 
 ## Installation
 
