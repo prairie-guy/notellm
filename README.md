@@ -8,7 +8,7 @@
 %cc Load the penguins dataset searching for the most recent Altair 6.0 syntax, then converting to Polars
 ```
 
-Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session. It's essentially Claude Code in a notebook cell rather than the command line. The `%cc` cells act as scaffolding that I typically remove once the code is working.
+It's Claude Code in a notebook cell rather than the command line. The `%cc` cells act as scaffolding that I typically remove once the code is working.
 
 This differs from sidebar-based approaches where you chat with an LLM **outside** of the notebook. With `notellm`, code development happens iteratively from **within** the notebook cells.
 
