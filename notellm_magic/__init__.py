@@ -2,7 +2,7 @@
 notellm IPython Extension
 
 Fork of claude-code-jupyter-staging (MIT License, Anthropic)
-Provides %%cc magic for Claude Code integration in Jupyter notebooks.
+Provides %cc magic for Claude Code integration in Jupyter notebooks.
 """
 
 from pathlib import Path
