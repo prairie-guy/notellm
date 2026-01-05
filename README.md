@@ -5,7 +5,7 @@
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. `notellm` provides the `%cc` magic command that lets Claude work *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells:
 
 ```python
-%cc Load the penguins dataset searching for the most recent Altair 6.0 syntax, then converting to Polars
+%cc Import the penguin dataset from altair. There was a change made in version 6.0. Search for the change. I prefer polars. No comments
 ```
 
 It's Claude Code in the notebook cell rather than the command line. The `%cc` cells are used to develop and iterate code, then deleted once the code is working.
