@@ -5,12 +5,12 @@
 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. `notellm` provides the `%cc` magic command that lets Claude work *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells:
 
 ```python
-%cc Load the penguins dataset searching for the most recent Altair 6.0 syntax, convert to Polars
+%cc Load the penguins dataset searching for the most recent Altair 6.0 syntax, then converting to Polars
 ```
 
-Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session. The `%cc` cells act as scaffolding that I typically remove once the code is working.
+Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session. It's essentially Claude Code in a notebook cell rather than the command line. The `%cc` cells act as scaffolding that I typically remove once the code is working.
 
-This differs from sidebar-based approaches where you chat with an LLM separately and copy/paste results. With `notellm`, code development happens iteratively from within notebook cells.
+This differs from sidebar-based approaches where you chat with an LLM **outside** of the notebook. With `notellm`, code development happens iteratively from **within** the notebook cells.
 
 I work in bioinformatics and developed `notellm` for myself, but hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
 
@@ -23,7 +23,7 @@ I work in bioinformatics and developed `notellm` for myself, but hopefully it's 
 - Conversation continuity across cells
 - Automatic permissions setup for common operations
 
-**See also:** [Vizard](https://github.com/prairie-guy/vizard) — a stateful declarative language for LLM-driven Python visualization code combining structured keywords with natural language. It includes a large `CLAUDE.md` file optimized for use with Polars and Altair. Example:
+**See also:** [Vizard](https://github.com/prairie-guy/vizard) — I developed Vizard as a more constrained, higher-level language for specifying Polars and Altair code. The goal was more reproducible visualizations through a stateful declarative syntax combining CAPITALIZED keywords with natural language. Vizard includes a large `CLAUDE.md` specification file that guides Claude to generate consistent, predictable code. Example:
 
 ```python
 %%cc
