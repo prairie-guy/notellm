@@ -4,6 +4,10 @@ Lightweight Jupyter magic extension for Claude Code integration.
 
 Fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyter-staging/) (MIT License, Anthropic).
 
+## Demo
+
+[View demo notebook](https://nbviewer.org/github/prairie-guy/notellm/blob/main/docs/demo.ipynb)
+
 ## Installation
 
 ### Prerequisites
@@ -13,11 +17,13 @@ Fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyt
 npm install -g @anthropic-ai/claude-code
 ```
 
-2. Install Python dependencies in your environment:
+2. Install Python dependencies (pip only):
 ```bash
-pip install trio claude-code-sdk
+pip install trio claude-agent-sdk
 ```
-(tested with trio==0.24.0, claude-code-sdk==0.1.0)
+(tested with trio==0.24.0, claude-agent-sdk==0.1.18)
+
+**Note:** Use pip for these dependencies. The `claude-agent-sdk` package is only available on PyPI, not conda-forge.
 
 ### Install notellm_magic
 
@@ -41,7 +47,14 @@ In a Jupyter notebook:
 %load_ext notellm_magic
 ```
 
-On successful load, you'll see:
+On first load in a directory, notellm creates `.claude/settings.local.json` with default permissions:
+
+```
+Created .claude/settings.local.json
+  (Permissions: Bash, Glob, Grep, Read, Edit, Write, WebSearch, WebFetch)
+```
+
+Then you'll see:
 
 ```
 Claude Code Magic loaded!
@@ -52,6 +65,20 @@ Features:
   • Session state preservation
   • Conversation continuity across cells
 ```
+
+### Permissions
+
+The auto-created `.claude/settings.local.json` grants Claude access to:
+- **Bash** - Run shell commands
+- **Glob** - Find files by pattern
+- **Grep** - Search file contents
+- **Read** - Read files
+- **Edit** - Modify files
+- **Write** - Create files
+- **WebSearch** - Search the web
+- **WebFetch** - Fetch web content
+
+To customize, edit `.claude/settings.local.json` in your project directory.
 
 ### Basic Usage
 
