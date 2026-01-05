@@ -47,24 +47,22 @@ In a Jupyter notebook:
 %load_ext notellm_magic
 ```
 
-On first load in a directory, notellm creates `.claude/settings.local.json` with default permissions:
+On load, you'll see a security warning and the Claude Code Magic banner:
 
 ```
-Created .claude/settings.local.json
-  (Permissions: Bash, Glob, Grep, Read, Edit, Write, WebSearch, WebFetch)
-```
+================================================================================
+WARNING: Claude has permissions for Bash, Read, Write, Edit, WebSearch, WebFetch
 
-Then you'll see:
+  Claude can execute shell commands, read/write/edit files, and access the web.
+  Only use in trusted environments.
 
-```
+  Consider removing .claude/settings.local.json when done.
+================================================================================
+
 Claude Code Magic loaded!
-Features:
-  • Full agentic Claude Code execution
-  • Cell-based code approval workflow
-  • Real-time message streaming
-  • Session state preservation
-  • Conversation continuity across cells
 ```
+
+On first load in a directory, notellm also creates `.claude/settings.local.json` with default permissions.
 
 ### Permissions
 
@@ -132,10 +130,12 @@ notellm/
 ├── archive/
 │   └── cc_jupyter/           # Pristine copy from PyPI
 ├── notellm_magic/
-│   ├── __init__.py           # Thin wrapper
+│   ├── __init__.py           # Thin wrapper + permissions setup
 │   └── cc_jupyter/           # Patched fork
 ├── build/
 │   └── build_notellm_magic.sh
+├── docs/
+│   └── demo.ipynb            # Demo notebook
 ├── setup.sh
 ├── uninstall.sh
 ├── LICENSE
