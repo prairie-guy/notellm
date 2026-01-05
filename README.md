@@ -2,11 +2,17 @@
 
 **Lightweight Jupyter magic extension for Claude Code integration.**
 
-notellm brings the full power of [Claude Code](https://docs.anthropic.com/en/docs/claude-code) directly into your Jupyter notebooks. It is a fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyter-staging/), a development version from Anthropic, adapted for my personal workflow.
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. notellm is a fork of [claude-code-jupyter-staging](https://pypi.org/project/claude-code-jupyter-staging/), a development version from Anthropic, adapted for my workflow.
 
-[Jupyter AI](https://jupyter-ai.readthedocs.io/) is a great tool, but I prefer developing code iteratively from the command line within my notebook. With notellm, Claude works *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells as part of your interactive workflow. The `%cc` cells act as scaffolding that I typically remove once the code is working.
+[Jupyter AI](https://jupyter-ai.readthedocs.io/) is a great tool, but I prefer developing code iteratively from within notebook cells. With notellm, Claude works *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells. The `%cc` cells act as scaffolding that I typically remove once the code is working:
 
-Built for data scientists and bioinformaticians who want an agentic coding assistant embedded in their analysis environment.
+```python
+%cc Load the penguins dataset using Altair 6.0 syntax, convert to Polars
+```
+
+Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session.
+
+I work in bioinformatics and developed notellm for myself, but hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
 
 **Key features:**
 - Full agentic Claude Code execution within notebook cells
@@ -15,7 +21,14 @@ Built for data scientists and bioinformaticians who want an agentic coding assis
 - Conversation continuity across cells
 - Automatic permissions setup for common operations
 
-**See also:** [Vizard](https://github.com/prairie-guy/vizard) — a domain-specific language for data visualization that I developed using the same underlying Claude Code Jupyter integration. Vizard provides a stateful declarative language combining CAPITALIZED keywords with natural language for creating Altair and Matplotlib visualizations with Polars dataframes.
+**See also:** [Vizard](https://github.com/prairie-guy/vizard) — a domain-specific language I developed for data visualization using the same Claude Code Jupyter integration. Example:
+
+```python
+%%cc
+DATA penguins.csv FILTER species == "Adelie" || PLOT violin Y body_mass_g COLOR sex
+```
+
+Vizard combines CAPITALIZED keywords with natural language to create Altair and Matplotlib visualizations with Polars dataframes.
 
 ## Demo
 
