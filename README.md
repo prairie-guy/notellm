@@ -12,7 +12,7 @@ It's Claude Code in the notebook cell rather than the command line. The `%cc` ce
 
 This differs from sidebar-based approaches where you chat with an LLM **outside** of the notebook. With `notellm`, code development happens iteratively from **within** the notebook cells.
 
-I work in bioinformatics and developed `notellm` for myself, but hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
+I work in bioinformatics and developed `notellm` for my own research projects. Hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
 
 `notellm` is adapted from a development version released by Anthropic. Any issues are my own.
 
