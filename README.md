@@ -1,8 +1,8 @@
-# notellm
+# `notellm`
 
 **Lightweight Jupyter magic extension for Claude Code integration.**
 
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. notellm provides the `%cc` magic command that lets Claude work *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells:
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) is my favorite LLM tool, and I wanted to use it directly within Jupyter notebooks. `notellm` provides the `%cc` magic command that lets Claude work *inside* your notebook—executing code, accessing your variables, searching the web, and creating new cells:
 
 ```python
 %cc Load the penguins dataset searching for the most recent Altair 6.0 syntax, convert to Polars
@@ -10,11 +10,11 @@
 
 Claude searches for the current API, writes the code, and creates a new cell with the result—all within my notebook session. The `%cc` cells act as scaffolding that I typically remove once the code is working.
 
-This differs from sidebar-based approaches where you chat with an LLM separately and copy/paste results. With notellm, code development happens iteratively from within notebook cells.
+This differs from sidebar-based approaches where you chat with an LLM separately and copy/paste results. With `notellm`, code development happens iteratively from within notebook cells.
 
-I work in bioinformatics and developed notellm for myself, but hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
+I work in bioinformatics and developed `notellm` for myself, but hopefully it's useful for other bioinformaticians, data scientists, or anyone wanting to use Claude Code within Jupyter.
 
-notellm is adapted from a development version released by Anthropic. Any issues are my own.
+`notellm` is adapted from a development version released by Anthropic. Any issues are my own.
 
 **Key features:**
 - Full agentic Claude Code execution within notebook cells
@@ -51,19 +51,24 @@ pip install trio claude-agent-sdk
 
 **Note:** Use pip for these dependencies. The `claude-agent-sdk` package is only available on PyPI, not conda-forge.
 
-### Install notellm_magic
+### Install `notellm_magic`
 
 ```bash
+git clone https://github.com/prairie-guy/notellm.git
+cd notellm
 ./setup.sh
 ```
 
-This copies `notellm_magic/` to your user site-packages.
+`setup.sh` copies `notellm_magic/` to your Python user site-packages directory (determined by `python3 -c "import site; print(site.USER_SITE)"`), typically `~/.local/lib/python3.x/site-packages/`.
 
 ### Uninstall
 
 ```bash
+cd notellm
 ./uninstall.sh
 ```
+
+`uninstall.sh` removes `notellm_magic/` from the same user site-packages location.
 
 ## Usage
 
