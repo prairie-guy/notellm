@@ -8,7 +8,7 @@
 %cc Import the penguin dataset from altair. There was a change made in version 6.0. Search for the change. No comments
 ```
 
-It's Claude Code in the notebook cell rather than the command line. The `%cc` cells are used to develop and iterate code, then deleted once the code is working.
+It's Claude Code in the notebook cell rather than in the command line. The `%cc` cells are used to develop and iterate code, then deleted once the code is working.
 
 This differs from sidebar-based approaches where you chat with an LLM **outside** of the notebook. With `notellm`, code development happens iteratively from **within** the notebook cells.
 
